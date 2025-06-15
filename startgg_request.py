@@ -1,0 +1,352 @@
+import requests
+from typing import Optional, Dict, Any
+
+class StartGG:
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.base_url = "https://api.start.gg/gql/alpha"
+        self.headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+
+    def _make_request(self, query: str, variables: Optional[Dict] = None) -> Optional[Dict[str, Any]]:
+        """Méthode interne pour les requêtes GraphQL"""
+        payload = {
+            "query": query,
+            "variables": variables or {}
+        }
+        
+        try:
+            response = requests.post(
+                self.base_url,
+                headers=self.headers,
+                json=payload,
+                timeout=10
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"Erreur API: {e}")
+            return None
+    
+    def get_tournament(self, event_slug: str) -> Optional[Dict[str, Any]]:
+        """Récupère les informations d'un événement par son slug."""
+        query = """
+ query Tournament($slug: String!) {
+     tournament(slug: $slug) {
+        name
+        events {
+            id
+            name
+            numEntrants
+        }
+        admins(roles: null) {
+            name
+        }
+    }
+}
+        """
+        variables = {"slug": event_slug}
+        response = self._make_request(query, variables)
+        if response and "data" in response:
+            return response["data"]["tournament"]
+        return None
+    
+    def get_event_phases(self, event_id: str) -> Optional[Dict[str, Any]]:
+        """Récupère les phases d'un événement par son ID."""
+        query = """
+ query EventPhases($eventId: ID!) {
+      event(id: $eventId) {
+                            id
+                            name
+                            phases {
+                                id
+                                name
+                                phaseGroups {
+                                    nodes {
+                                        id
+                                        displayIdentifier
+                                    }
+                                }
+                            }
+                        }
+}
+        """
+        variables = {"eventId": event_id}
+        response = self._make_request(query, variables)
+        if response and "data" in response:
+            return response["data"]["event"]["phases"]
+        return None
+    
+    #Récupère les matchs d'une phase spécifique
+    def get_phase_matches(self,eventId : str ,  phase_id: str, phaseGroupId : str , state = 1 ) -> Optional[Dict[str, Any]]:
+        """Récupère les matchs d'une phase spécifique. permet de filtrer par état."""
+        query = """
+    query PhaseSets($phaseId: ID!,$phaseGroupId: ID!, $eventId: ID! , $state: [Int]!) {
+         event(id: $eventId) {
+        phases(phaseId: $phaseId) {
+            id
+            name
+            sets(filters: { phaseGroupIds: [$phaseGroupId], state: $state , hideEmpty: true}) {
+                nodes {
+                    id
+                    identifier
+                    slots {
+                        entrant {
+                            name
+                            id
+                        }
+                        standing {
+                            stats {
+                                score {
+                                    value
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    }
+        """
+        variables = {"phaseId": phase_id , "phaseGroupId": phaseGroupId, "eventId": eventId , "state": state}
+        response = self._make_request(query, variables)
+        if response and "data" in response:
+            return response["data"]["event"]["phases"]
+        print("Aucun match trouvé pour cette phase.")
+        return None
+    #Update le score d'un match
+    def update_match_score(self, set_id: str, games: list[Dict], winner_id: str) -> Optional[Dict[str, Any]]:
+        """Met à jour le score d'un match avec reportBracketSet
+        
+        Args:
+            set_id: ID du set (ex: "90260300")
+            games: Liste des jeux [
+                {
+                    "winnerId": str,  # ID de l'entrant gagnant
+                    "gameNum": int,        # Numéro de la partie (commence à 1)
+                    "selections": List[Dict]  # Optionnel
+                    [
+                        {"entrantId": str, "characterId": int},  # ID de l'entrant et ID du personnage
+                        ...
+                    ]
+                }
+            ]
+            winner_id: ID de l'entrant gagnant
+        """
+        query = """
+    mutation ReportBracketSet($setId: ID!, $winnerId: ID!, $gameData: [BracketSetGameDataInput!]!) {
+        reportBracketSet(
+            setId: $setId,
+            winnerId: $winnerId,
+            gameData: $gameData
+        ) {
+            id
+            state
+            identifier
+        }
+    }
+        """
+        
+        # Formatage strict selon les exigences de l'API
+        formatted_games = []
+        for game in games:
+            formatted_game = {
+                "gameNum": game["gameNum"],  # Doit commencer à 1
+                "winnerId": game["winnerId"],  # ID de l'entrant gagnant
+                "selections": game.get("selections", [])
+            }
+            formatted_games.append(formatted_game)
+        
+        variables = {
+            "setId": set_id,
+            "winnerId": winner_id,
+            "gameData": games
+        }
+        
+        response = self._make_request(query, variables)
+        return response
+
+        if response and "data" in response:
+            return response["data"]["reportBracketSet"]
+        
+        print("Erreur:", response.get("errors", "Unknown error"))
+        return None
+    def update_matche_score(self, set_id: str, games: list[Dict], winner_id: str) -> Optional[Dict[str, Any]]:
+        """Met à jour le score d'un match avec reportBracketSet
+        
+        Args:
+            set_id: ID du set (ex: "90260300")
+            games: Liste des jeux [
+                {
+                    "winnerId": str,  # ID de l'entrant gagnant
+                    "gameNum": int,        # Numéro de la partie (commence à 1)     
+                    "selections": List[Dict]  # Optionnel
+                    [   
+                        {"entrantId": str, "characterId": int},  # ID de l'entrant et ID du personnage
+                        ... 
+                    ]
+                }
+            ]
+            winner_id: ID de l'entrant gagnant
+        """
+        query = """
+    mutation ReportBracketSet($setId: ID!, $winnerId: ID!, $gameData: [BracketSetGameDataInput!]!) {
+        reportBracketSet(
+            setId: $setId,
+            winnerId: $winnerId,    
+            gameData: $gameData
+        ) { 
+            id
+            state
+            identifier
+        }
+    }   
+        """
+        # Formatage strict selon les exigences de l'API
+        formatted_games = []
+        for game in games:
+            formatted_game = {
+                "gameNum": game["gameNum"],  # Doit commencer à 1
+                "winnerId": game["winnerId"],  # ID de l'entrant gagnant
+                "selections": game.get("selections", [])
+            }
+            formatted_games.append(formatted_game)
+        variables = {
+            "setId": set_id,
+            "winnerId": winner_id,
+            "gameData": formatted_games
+        }
+        response = self._make_request(query, variables)
+        # return response
+        if response and "data" in response:
+            return response["data"]["reportBracketSet"]
+        print("Erreur:", response.get("errors", "Unknown error"))
+        return None
+    
+
+    def get_all_characters(self, id : int =1386) -> Optional[Dict[str, Any]]:
+        """Récupère tous les personnages disponibles."""
+        query = """
+   query Videogame ($id: ID!) {
+    videogame(id: $id) {
+        characters {
+            name
+            id
+        }
+    }
+}
+
+        """
+        variables = {"id": id}
+        response = self._make_request(query, variables)
+        if response and "data" in response:
+            return response["data"]["videogame"]["characters"]
+        print("Erreur lors de la récupération des personnages:", response.get("errors", "Unknown error"))
+        return None
+
+    def get_all_player_event(self, event_id: str) -> Optional[Dict[str, Any]]:
+        """Récupère tous les joueurs d'un événement."""
+        query = """
+    query EventPlayers ($eventId: ID!, $pageNumber: Int!) {
+    event(id: $eventId) {
+        entrants(query: { page: $pageNumber, perPage: 100 }) {
+            nodes {
+                id
+                name
+                participants {
+                    user {
+                        authorizations {
+                            id
+                            externalId
+                            externalUsername
+                            type
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+        """
+        for page in range(1, 100):
+            variables = {"eventId": event_id, "pageNumber": page}
+            response = self._make_request(query, variables)
+            if response and "data" in response:
+                players = response["data"]["event"]["entrants"]["nodes"]
+                if not players:
+                    break
+            else:
+                print("Erreur lors de la récupération des joueurs:", response.get("errors", "Unknown error"))
+                return None
+            if page == 1:
+                all_players = players
+            else:
+                all_players.extend(players)
+        return all_players if 'all_players' in locals() else None
+
+# Exemple d'utilisation
+from dotenv import load_dotenv
+import os
+
+load_dotenv()  # Charge le fichier .env
+
+sggKey = os.getenv('START_GG_KEY')
+print(sggKey)  # Affiche la clé API pour vérification
+sgg = StartGG(sggKey)  # Remplacez "your_api_key
+
+event_data = sgg.get_tournament("test-7545")  # Remplacez "event_slug_here" par le slug de l'événement réel
+print(event_data)
+
+# phases_data = sgg.get_event_phases("1366944")  # Remplacez "event_id_here" par l'ID de l'événement réel
+# print(phases_data)
+
+# phase_matches = sgg.get_phase_matches("1366944", "1956358","2872458",2)  # Remplacez "phase_id_here" par l'ID de la phase réelle
+# print(phase_matches)
+
+# games_data = [
+#     {
+#         "gameNum": 1,        # IMPORTANT: commence à 1, pas à 0
+#         "winnerId": "20412918",  # ID de l'entrant gagnant
+#         "selections": [
+#             {"entrantId": "20412918", "characterId": 1271},  # ID de l'entrant et ID du personnage
+#             {"entrantId": "20412928", "characterId": 1277}   # ID de l'entrant et ID du personnage
+#         ]
+        
+#     },
+#     {
+#         "winnerId": "20412928",  # ID de l'entrant gagnant
+#         "gameNum": 2, 
+#         "selections": [
+#             {"entrantId": "20412918", "characterId": 1271},  # ID de l'entrant et ID du personnage
+#             {"entrantId": "20412928", "characterId": 1277}   # ID de l'entrant et ID du personnage
+#         ]
+       
+#     },
+#     # {
+#     #     "gameNum": 3,        # IMPORTANT: commence à 1, pas à 0
+#     #     "winnerId": "20412918",  # ID de l'entrant gagnant
+#     #     "selections": [
+#     #         {"entrantId": "20412918", "characterId": 1271},  # ID de l'entrant et ID du personnage
+#     #         {"entrantId": "20412928", "characterId": 1277}   # ID de l'entrant et ID du personnage
+#     #     ]
+#     # }
+# ]
+
+# result = sgg.update_match_score(
+#     set_id="90299822",
+#     games=games_data,
+#     winner_id="20412918"  # ID de l'entrant gagnant
+# )
+# print(result)  # Affiche le résultat de la mise à jour du match
+
+# characters = sgg.get_all_characters()
+# print(characters)  # Affiche tous les personnages disponibles
+
+# players = sgg.get_all_player_event("1366944")  # Remplacez "event_id_here" par l'ID de l'événement réel
+# print(players)  # Affiche tous les joueurs de l'événement
+# print(len(players))  # Affiche le nombre total de joueurs récupérés
