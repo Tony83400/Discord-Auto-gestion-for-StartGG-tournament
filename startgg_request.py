@@ -168,66 +168,13 @@ class StartGG:
         }
         
         response = self._make_request(query, variables)
-        return response
-
-        if response and "data" in response:
-            return response["data"]["reportBracketSet"]
-        
-        print("Erreur:", response.get("errors", "Unknown error"))
-        return None
-    def update_matche_score(self, set_id: str, games: list[Dict], winner_id: str) -> Optional[Dict[str, Any]]:
-        """Met à jour le score d'un match avec reportBracketSet
-        
-        Args:
-            set_id: ID du set (ex: "90260300")
-            games: Liste des jeux [
-                {
-                    "winnerId": str,  # ID de l'entrant gagnant
-                    "gameNum": int,        # Numéro de la partie (commence à 1)     
-                    "selections": List[Dict]  # Optionnel
-                    [   
-                        {"entrantId": str, "characterId": int},  # ID de l'entrant et ID du personnage
-                        ... 
-                    ]
-                }
-            ]
-            winner_id: ID de l'entrant gagnant
-        """
-        query = """
-    mutation ReportBracketSet($setId: ID!, $winnerId: ID!, $gameData: [BracketSetGameDataInput!]!) {
-        reportBracketSet(
-            setId: $setId,
-            winnerId: $winnerId,    
-            gameData: $gameData
-        ) { 
-            id
-            state
-            identifier
-        }
-    }   
-        """
-        # Formatage strict selon les exigences de l'API
-        formatted_games = []
-        for game in games:
-            formatted_game = {
-                "gameNum": game["gameNum"],  # Doit commencer à 1
-                "winnerId": game["winnerId"],  # ID de l'entrant gagnant
-                "selections": game.get("selections", [])
-            }
-            formatted_games.append(formatted_game)
-        variables = {
-            "setId": set_id,
-            "winnerId": winner_id,
-            "gameData": formatted_games
-        }
-        response = self._make_request(query, variables)
         # return response
+
         if response and "data" in response:
             return response["data"]["reportBracketSet"]
+        
         print("Erreur:", response.get("errors", "Unknown error"))
         return None
-    
-
     def get_all_characters(self, id : int =1386) -> Optional[Dict[str, Any]]:
         """Récupère tous les personnages disponibles."""
         query = """
@@ -288,6 +235,37 @@ class StartGG:
             else:
                 all_players.extend(players)
         return all_players if 'all_players' in locals() else None
+    def startMatch(self, matchId: str):
+        """Démarre un match en utilisant l'API StartGG."""
+        query = """
+        mutation MarkSetInProgress ($matchId: ID!) {
+            markSetInProgress(setId: $matchId) {
+                id
+            }
+        }
+        """
+        variables = {"matchId": matchId}
+        response = self._make_request(query, variables)
+        if response and "data" in response:
+            return response["data"]["markSetInProgress"]
+        print("Erreur lors du démarrage du match:", response.get("errors", "Unknown error"))
+        return None
+    def assign_station_to_set (self, set_id: str, station_id: str) -> Optional[Dict[str, Any]]:
+        """Assigne une station à un set."""
+        query = """
+        mutation assignStation($setId: ID!, $stationId: ID!) {
+            assignStation(setId: $setId, stationId: $stationId) {
+                identifier
+            }
+        }
+        """
+        variables = {"setId": set_id, "stationId": station_id}
+        response = self._make_request(query, variables)
+        if response and "data" in response:
+            return response["data"]["assignStation"]
+        print("Erreur lors de l'assignation de la station:", response.get("errors", "Unknown error"))
+        return None
+
 
 # Exemple d'utilisation
 from dotenv import load_dotenv
@@ -296,16 +274,15 @@ import os
 load_dotenv()  # Charge le fichier .env
 
 sggKey = os.getenv('START_GG_KEY')
-print(sggKey)  # Affiche la clé API pour vérification
 sgg = StartGG(sggKey)  # Remplacez "your_api_key
 
-event_data = sgg.get_tournament("test-7545")  # Remplacez "event_slug_here" par le slug de l'événement réel
-print(event_data)
+# event_data = sgg.get_tournament("test-7545")  # Remplacez "event_slug_here" par le slug de l'événement réel
+# print(event_data)
 
 # phases_data = sgg.get_event_phases("1366944")  # Remplacez "event_id_here" par l'ID de l'événement réel
 # print(phases_data)
 
-# phase_matches = sgg.get_phase_matches("1366944", "1956358","2872458",2)  # Remplacez "phase_id_here" par l'ID de la phase réelle
+# phase_matches = sgg.get_phase_matches("1366944", "1956358","2872458",1)  # Remplacez "phase_id_here" par l'ID de la phase réelle
 # print(phase_matches)
 
 # games_data = [
@@ -350,3 +327,9 @@ print(event_data)
 # players = sgg.get_all_player_event("1366944")  # Remplacez "event_id_here" par l'ID de l'événement réel
 # print(players)  # Affiche tous les joueurs de l'événement
 # print(len(players))  # Affiche le nombre total de joueurs récupérés
+
+# match_start = sgg.startMatch("90299824")
+# print(match_start)  # Affiche le résultat du démarrage du match
+
+station_assignment = sgg.assign_station_to_set("90299824", "1307196")  # Remplacez par les IDs réels
+print(station_assignment)  # Affiche le résultat de l'assignation de la station
