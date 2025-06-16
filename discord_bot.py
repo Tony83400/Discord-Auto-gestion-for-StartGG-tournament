@@ -3,6 +3,7 @@ import os
 
 from dotenv import load_dotenv
 from startgg_request import StartGG
+from match_manager import MatchManager
 
 import asyncio
 import traceback
@@ -15,7 +16,7 @@ from discord.ext import commands
 from match_report import send_match_report
 from startgg_request import StartGG
 from match import Match
-# from tournament import Tournament
+from tournament import Tournament
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -28,9 +29,7 @@ async def on_ready():
     
     if guild:
         try:
-            # Catégorie pour les matchs
-            # matches_category = await guild.create_category("⚔ Matchs en cours")
-            # await guild.create_text_channel(f"match-A", category=matches_category)
+ 
             print(f"Bot prêt sur le serveur: {guild.name} ({guild.id})")
             
         except discord.Forbidden:
@@ -124,4 +123,219 @@ async def start_match(ctx , myMatch: Match):
             return
 
     await ctx.send("**Processus terminé**")
+    return myMatch
+
+# Variable globale pour le gestionnaire (à ajouter après les imports)
+match_manager = None
+current_tournament = None
+
+# Nouvelles commandes à ajouter à ton bot
+
+@bot.command()
+async def setup_tournament(ctx, tournament_slug: str, event_id: int, phase_id: int, pool_id: int , best_of: int = 3):
+    """Configure un tournoi pour la gestion automatique"""
+    global match_manager, current_tournament
+    
+    try:
+        await ctx.send(f"⚙️ Configuration du tournoi: {tournament_slug}")
+        
+        # Créer l'objet tournament
+        tournament = Tournament(tournament_slug)
+        tournament.select_event(event_id)
+        tournament.select_event_phase(phase_id)
+        tournament.select_pool(pool_id)
+        tournament.set_best_of(best_of)
+        
+        # Créer le gestionnaire de matchs
+        match_manager = MatchManager(bot, tournament)
+        current_tournament = tournament
+        
+        # Afficher les infos
+        stations_count = len([s for s in tournament.station if not s['isUsed']])
+        await ctx.send(f"✅ Tournoi configuré!\n"
+                      f"📊 Événement: {tournament.selectedEvent['name']}\n"
+                      f"🎮 Stations disponibles: {stations_count}")
+        
+    except Exception as e:
+        await ctx.send(f"❌ Erreur lors de la configuration: {e}")
+
+@bot.command()
+async def start_matches(ctx):
+    """Démarre la gestion automatique des matchs"""
+    global match_manager
+    
+    if not match_manager:
+        await ctx.send("❌ Aucun tournoi configuré. Utilisez `!setup_tournament` d'abord.")
+        return
+    
+    await match_manager.start_match_processing(ctx)
+
+@bot.command()
+async def stop_matches(ctx):
+    """Arrête la gestion automatique des matchs"""
+    global match_manager
+    
+    if not match_manager:
+        await ctx.send("❌ Aucun gestionnaire actif.")
+        return
+    
+    await match_manager.stop_match_processing(ctx)
+
+@bot.command()
+async def match_status(ctx):
+    """Affiche le statut du gestionnaire de matchs"""
+    global match_manager
+    
+    if not match_manager:
+        await ctx.send("❌ Aucun gestionnaire configuré.")
+        return
+    
+    await match_manager.get_status(ctx)
+
+@bot.command()
+async def refresh_matches(ctx):
+    """Recharge la liste des matchs en attente"""
+    global match_manager
+    
+    if not match_manager:
+        await ctx.send("❌ Aucun gestionnaire configuré.")
+        return
+    
+    if await match_manager.initialize_matches(ctx):
+        await ctx.send("🔄 Liste des matchs rechargée!")
+
+@bot.command()
+async def force_station_free(ctx, station_number: int):
+    """Force la libération d'une station (en cas de problème)"""
+    global current_tournament, match_manager
+    
+    if not current_tournament:
+        await ctx.send("❌ Aucun tournoi configuré.")
+        return
+    
+    try:
+        # Libérer la station dans le tournament
+        for station in current_tournament.station:
+            if station['number'] == station_number:
+                station['isUsed'] = False
+                if 'current_match' in station:
+                    del station['current_match']
+                break
+        
+        # Nettoyer le match manager si nécessaire
+        if match_manager and station_number in match_manager.active_matches:
+            await match_manager.cleanup_completed_match(ctx, station_number)
+        
+        await ctx.send(f"🔧 Station {station_number} forcée à être libre")
+        
+    except Exception as e:
+        await ctx.send(f"❌ Erreur: {e}")
+
+@bot.command()
+async def list_stations(ctx):
+    """Liste toutes les stations et leur statut"""
+    global current_tournament
+    
+    if not current_tournament:
+        await ctx.send("❌ Aucun tournoi configuré.")
+        return
+    
+    embed = discord.Embed(title="🎮 Statut des Stations", color=0x3498db)
+    
+    for station in current_tournament.station:
+        status = "🔴 Occupée" if station['isUsed'] else "🟢 Libre"
+        match_info = ""
+        
+        if station['isUsed'] and 'current_match' in station:
+            match = station['current_match']
+            p1 = match['slots'][0]['entrant']['name']
+            p2 = match['slots'][1]['entrant']['name']
+            match_info = f"\n📋 {p1} vs {p2}"
+        
+        embed.add_field(
+            name=f"Station {station['number']}",
+            value=f"{status}{match_info}",
+            inline=True
+        )
+    
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def manual_assign(ctx, station_number: int):
+    """Assigne manuellement le prochain match à une station spécifique"""
+    global match_manager
+    
+    if not match_manager:
+        await ctx.send("❌ Aucun gestionnaire configuré.")
+        return
+    
+    if not match_manager.pending_matches:
+        await ctx.send("❌ Aucun match en attente.")
+        return
+    
+    # Vérifier que la station est libre
+    station_free = False
+    for station in match_manager.tournament.station:
+        if station['number'] == station_number and not station['isUsed']:
+            station_free = True
+            break
+    
+    if not station_free:
+        await ctx.send(f"❌ La station {station_number} n'est pas disponible.")
+        return
+    
+    # Assigner le match
+    next_match = match_manager.pending_matches.pop(0)
+    await match_manager.assign_match_to_station(ctx, next_match, station_number)
+
+# Commande d'aide pour expliquer l'utilisation
+@bot.command()
+async def help_tournament(ctx):
+    """Affiche l'aide pour la gestion des tournois"""
+    embed = discord.Embed(title="🎯 Guide de Gestion des Tournois", color=0x00ff00)
+    
+    embed.add_field(
+        name="1️⃣ Configuration",
+        value="`!setup_tournament <slug> <event_id> <phase_id> <pool_id>`\n"
+              "Configure le tournoi avec les IDs nécessaires",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="2️⃣ Démarrage",
+        value="`!start_matches`\nDémarre la gestion automatique",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="3️⃣ Contrôle",
+        value="`!match_status` - Voir le statut\n"
+              "`!stop_matches` - Arrêter la gestion\n"
+              "`!refresh_matches` - Recharger les matchs",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="4️⃣ Gestion des stations",
+        value="`!list_stations` - Voir toutes les stations\n"
+              "`!force_station_free <num>` - Libérer une station\n"
+              "`!manual_assign <num>` - Assigner manuellement",
+        inline=False
+    )
+    
+    await ctx.send(embed=embed)
+@bot.command()
+async def force_refresh(ctx):
+    """Force le rafraîchissement des matchs en attente"""
+    global match_manager
+    
+    if not match_manager:
+        await ctx.send("❌ Aucun gestionnaire configuré.")
+        return
+    
+    if await match_manager.refresh_pending_matches(ctx):
+        await ctx.send("🔄 Nouveaux matchs récupérés!")
+    else:
+        await ctx.send("ℹ️ Aucun nouveau match trouvé")
+
 bot.run(token)

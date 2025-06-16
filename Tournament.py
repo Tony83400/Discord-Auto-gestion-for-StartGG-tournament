@@ -19,6 +19,7 @@ class Tournament:
         self.selectedPoolId = None
         self.playerList = []
         self.characterList = self.sgg_request.get_all_characters() #Peut etre changer pour d'autre jeux
+        self.bestOf_N = 3  # Nombre de jeux par match, peut être modifié selon le tournoi
         result = self.sgg_request.get_tournament(slug)
         if result:
             self.events = result.get('events', [])
@@ -59,7 +60,11 @@ class Tournament:
                 self._set_player_list()
                 return
         raise ValueError(f"Event with slug '{event_id}' not found in tournament '{self.slug}'.")
-    
+    def set_best_of(self, bestOf_N: int):
+        if bestOf_N > 0:
+            self.bestOf_N = bestOf_N
+        else:
+            raise ValueError("Best of N must be a positive integer.")
     def get_event_phases(self):
         if self.selectedEvent:
             phases = self.sgg_request.get_event_phases(self.selectedEvent['id'])
@@ -124,7 +129,7 @@ class Tournament:
             raise ValueError("No phase selected. Please select an phase first.")
         if self.selectedPoolId == None:
             raise ValueError("No pool selected. Please select an pool first.")
-        myMatch = sggMatch_to_MyMatch(match, 3)
+        myMatch = sggMatch_to_MyMatch(match, self.bestOf_N)
         print(self.station)
         for s in self.station:
             if s['number'] == station_number:
@@ -151,37 +156,3 @@ def sggMatch_to_MyMatch(match, bestOf_N = 3):
     p2 = match['slots'][1]['entrant']
     matchId = match['id']
     return Match(p1, p2, matchId, bestOf_N, StartGG(sggKey))
-
-myTournament = Tournament("test-7545")
-
-myTournament.select_event(1366944)
-# print(myTournament.playerList)
-
-# phases = myTournament.get_event_phases()
-# print(phases)
-myTournament.select_pool(2872458)
-myTournament.select_event_phase(1956358)
-matches = myTournament.get_matches()
-# print(matches)
-
-# print(myTournament.station)
-# print(myTournament.events)
-# p1 = {'name': 'P4', 'id': 20412918}
-# p2 = {'name': 'P5', 'id': 20412928}
-# myMatch = Match(p1, p2,90324698, 5, myTournament.sgg_request)
-stationNum = myTournament.find_station_available()
-myTournament.assign_Match_to_station(matches[0], stationNum)
-# print(myTournament.station)
-# myMatch.set_station(1)
-# myMatch.start_match()
-# myMatch.report_Match(True, 1271, 1277)
-# myMatch.report_Match(True, 1271, 1277)
-# myMatch.report_Match(True, 1271, 1277)
-# myMatch.report_Match(True, 1271, 1277)
-
-sleep(30)  # Just to simulate some delay before checking the matches again
-matches = myTournament.get_matches()
-
-stationNum = myTournament.find_station_available()
-myTournament.assign_Match_to_station(matches[0], stationNum)
-print(myTournament.station)
