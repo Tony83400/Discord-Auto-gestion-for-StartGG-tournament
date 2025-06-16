@@ -42,6 +42,12 @@ class StartGG:
             name
             numEntrants
         }
+        stations(perPage: 500) {
+            nodes {
+                id
+                number
+            }
+        }
         admins(roles: null) {
             name
         }
@@ -106,6 +112,7 @@ class StartGG:
                             }
                         }
                     }
+
                 }
             }
         }
@@ -235,6 +242,7 @@ class StartGG:
             else:
                 all_players.extend(players)
         return all_players if 'all_players' in locals() else None
+    
     def startMatch(self, matchId: str):
         """Démarre un match en utilisant l'API StartGG."""
         query = """
@@ -331,5 +339,5 @@ sgg = StartGG(sggKey)  # Remplacez "your_api_key
 # match_start = sgg.startMatch("90299824")
 # print(match_start)  # Affiche le résultat du démarrage du match
 
-station_assignment = sgg.assign_station_to_set("90299824", "1307196")  # Remplacez par les IDs réels
-print(station_assignment)  # Affiche le résultat de l'assignation de la station
+# station_assignment = sgg.assign_station_to_set("90299824", "1307196")  # Remplacez par les IDs réels
+# print(station_assignment)  # Affiche le résultat de l'assignation de la station

@@ -7,7 +7,6 @@ token = os.getenv('DISCORD_BOT_TOKEN')
 
 import discord
 from discord.ext import commands
-from discord.ui import Select, View, Button, TextInput, Modal
 from match_report import send_match_report
 
 intents = discord.Intents.default()
@@ -22,7 +21,7 @@ async def on_ready():
     if guild:
         try:
             # Catégorie pour les matchs
-            matches_category = await guild.create_category("⚔ Matchs en cours")
+            # matches_category = await guild.create_category("⚔ Matchs en cours")
             # await guild.create_text_channel(f"match-A", category=matches_category)
 
             print("Salons créés avec succès!")
@@ -75,4 +74,3 @@ async def create_match(ctx, player1: str ="J1", player2: str = "J2"):
     )
     
 bot.run(token)
-
