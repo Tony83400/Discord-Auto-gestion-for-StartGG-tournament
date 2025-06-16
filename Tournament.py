@@ -17,6 +17,7 @@ class Tournament:
         self.selectedPhaseId = None
         self.selectedPoolId = None
         self.playerList = []
+        self.characterList = self.sgg_request.get_all_characters() #Peut etre changer pour d'autre jeux
         result = self.sgg_request.get_tournament(slug)
         if result:
             self.events = result.get('events', [])

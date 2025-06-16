@@ -1,6 +1,7 @@
 from discord.ui import Select, View, Button, TextInput, Modal
 import discord
 
+import asyncio
 class WinnerSelectView(View):
     """Vue pour sélectionner le vainqueur (même pattern que les persos)"""
     def __init__(self, parent_view):
@@ -163,6 +164,8 @@ async def send_match_report(channel, player1, player2, characters):
             self.p1_char = None
             self.p2_char = None
             self.main_message = None
+            self.completed = asyncio.Event()  # Nouveau: événement de complétion
+            self.final_result = None  # Nouveau: stockage du résultat final
 
         async def update_main_message(self):
             """Mise à jour unique de l'embed principal"""
@@ -215,7 +218,6 @@ async def send_match_report(channel, player1, player2, characters):
         @discord.ui.button(label="Choisir vainqueur", style=discord.ButtonStyle.blurple)
         async def select_winner(self, interaction, button):
             await self.show_winner_selector(interaction)
-
         @discord.ui.button(label="Valider", style=discord.ButtonStyle.success)
         async def submit(self, interaction, button):
             if None in [self.winner, self.p1_char, self.p2_char]:
@@ -225,34 +227,40 @@ async def send_match_report(channel, player1, player2, characters):
                 )
                 return
                 
-            winner = self.player1 if self.winner == "p1" else self.player2
+            # Préparation du résultat final
+            self.final_result = {
+                "p1_char": self.p1_char,
+                "p2_char": self.p2_char,
+                "winner": self.player1 if self.winner == "p1" else self.player2
+            }
+            
+            # Confirmation visuelle
             embed = discord.Embed(
                 title="🎉 Résultat enregistré !",
-                description=f"**{self.player1}** vs **{self.player2}**",
                 color=0x00ff00
             )
-            embed.add_field(name="Vainqueur", value=winner, inline=False)
-            embed.add_field(name=f"Perso {self.player1}", value=self.p1_char, inline=True)
-            embed.add_field(name=f"Perso {self.player2}", value=self.p2_char, inline=True)
-            
             await interaction.response.send_message(embed=embed)
+            
+            # Déclencher l'événement de complétion
+            self.completed.set()
             self.stop()
 
-    # Création et envoi du message principal
+    # Création de la vue
+    view = MatchReportView(player1, player2)
+    
+    # Envoi du message initial
     embed = discord.Embed(
-        title="⚔ Nouveau match",
-        description=f"{player1} vs {player2}",
+        title=f"⚔ {player1} vs {player2}",
+        description="Configurez le match:",
         color=0x3498db
     )
-    embed.add_field(name="Statut", value="En configuration...", inline=False)
-    
-    view = MatchReportView(player1, player2)
     view.main_message = await channel.send(embed=embed, view=view)
-    # renvoie un objet qui résume le match
-    return {
-        player1: view.p1_char,
-        player2: view.p2_char,
-        "winner": view.winner,
-    }
+    
+    # Attente active de la complétion
+    await view.completed.wait()
+    
+    # Retourne les résultats finaux
+    return view.final_result
+       
 
 

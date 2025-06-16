@@ -1,13 +1,21 @@
 from dotenv import load_dotenv
 import os
 
+from dotenv import load_dotenv
+from startgg_request import StartGG
+
+import asyncio
+import traceback
 load_dotenv()  # Charge le fichier .env
 
 token = os.getenv('DISCORD_BOT_TOKEN')
-
+sggKey = os.getenv('START_GG_KEY')
 import discord
 from discord.ext import commands
 from match_report import send_match_report
+from startgg_request import StartGG
+from match import Match
+# from tournament import Tournament
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -23,8 +31,7 @@ async def on_ready():
             # Catégorie pour les matchs
             # matches_category = await guild.create_category("⚔ Matchs en cours")
             # await guild.create_text_channel(f"match-A", category=matches_category)
-
-            print("Salons créés avec succès!")
+            print(f"Bot prêt sur le serveur: {guild.name} ({guild.id})")
             
         except discord.Forbidden:
             print("Erreur: Le bot n'a pas les permissions nécessaires")
@@ -59,18 +66,64 @@ async def remove_match(ctx, match_number: str = "a"):
         await ctx.send(f"Aucun salon trouvé avec le nom {channel_name}.")
 
 
-
-
 @bot.command()
-async def create_match(ctx, player1: str ="J1", player2: str = "J2"):
-    characters_list = ["Ryu", "Ken", "Chun-Li", "Zangief", "Cammy", "Blanka", "Guile", "Dhalsim", "M. Bison", "Akuma", "Sagat", "Vega", "Balrog", "E. Honda", "Ibuki", "Elena", "Juri", "Karin", "Laura", "Birdie", "F.A.N.G", "Rashid", "Necalli", "Zeku", "Ed", "Sakura", "Kage", "Lucia", "Poison", "Gill"]
-
-    # Utilisez ctx.channel pour envoyer dans le salon actuel
-    result = await send_match_report(
-        channel=ctx.channel,  # Envoie dans le salon où la commande a été tapée
-        player1=player1,      # Utilise le nom fourni en paramètre
-        player2=player2,      # Utilise le nom fourni en paramètre
-        characters=characters_list
-    )
+async def test(ctx):
+    p1 = {'id': 1, 'name': 'Player1', 'discordId': '1234567890', 'discordName': 'PlayerOne'}
+    p2 = {'id': 2, 'name': 'Player2', 'discordId': '0987654321', 'discordName': 'PlayerTwo'}
+    myMatch = Match(p1, p2, 90324698, 3, StartGG(sggKey))
+    myMatch.set_characters([
+        {'id': 1271, 'name': 'Character1'},
+        {'id': 1272, 'name': 'Character2'},
+        {'id': 1273, 'name': 'Character3'},
+        {'id': 1274, 'name': 'Character4'},
+        {'id': 1275, 'name': 'Character5'}
+    ])
     
+    myMatch.set_station(1)
+    myMatch.start_match()
+    await start_match(ctx, myMatch)
+
+    
+
+
+async def start_match(ctx , myMatch: Match):
+    """Commande pour gérer un match complet avec attente des reports"""
+    # Initialisation
+    p1 = myMatch.p1
+    p2 = myMatch.p2
+    
+    await ctx.send(f"**Match démarré** - {p1['name']} vs {p2['name']} (BO3)")
+
+    # Boucle des games
+    for game_num in range(1, myMatch.number_of_games_to_win + 1):
+        # 1. Envoi et attente du report
+        await ctx.send(f"**Game {game_num}** - En attente du report...")
+        
+        try:
+            # Cette ligne attendra que les joueurs aient tout complété
+            result = await send_match_report(
+                channel=ctx.channel,
+                player1=p1['name'],
+                player2=p2['name'],
+                characters= myMatch.charactersName  # Votre liste
+            )
+            
+            # 2. Traitement du résultat
+            if result["winner"] == p1['name']:
+                myMatch.report_Match(True, result['p1_char'], result['p2_char'])
+                await ctx.send(f"✅ Game {game_num} reportée: {p1['name']} gagne")
+            else:
+                myMatch.report_Match(False, result['p1_char'], result['p2_char'])
+                await ctx.send(f"✅ Game {game_num} reportée: {p2['name']} gagne")
+            
+            # 3. Vérification si le match est terminé
+            if myMatch.isComplete:  # À implémenter dans votre classe Match
+                await ctx.send("**Match terminé !**")
+                break
+                
+        except asyncio.TimeoutError:
+            await ctx.send("⌛ Temps écoulé - Match annulé")
+            return
+
+    await ctx.send("**Processus terminé**")
 bot.run(token)

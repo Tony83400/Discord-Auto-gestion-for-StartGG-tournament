@@ -180,7 +180,6 @@ class StartGG:
         if response and "data" in response:
             return response["data"]["reportBracketSet"]
         
-        print("Erreur:", response.get("errors", "Unknown error"))
         return None
     def get_all_characters(self, id : int =1386) -> Optional[Dict[str, Any]]:
         """Récupère tous les personnages disponibles."""
@@ -199,7 +198,6 @@ class StartGG:
         response = self._make_request(query, variables)
         if response and "data" in response:
             return response["data"]["videogame"]["characters"]
-        print("Erreur lors de la récupération des personnages:", response.get("errors", "Unknown error"))
         return None
 
     def get_all_player_event(self, event_id: str) -> Optional[Dict[str, Any]]:
@@ -235,7 +233,6 @@ class StartGG:
                 if not players:
                     break
             else:
-                print("Erreur lors de la récupération des joueurs:", response.get("errors", "Unknown error"))
                 return None
             if page == 1:
                 all_players = players
@@ -256,7 +253,6 @@ class StartGG:
         response = self._make_request(query, variables)
         if response and "data" in response:
             return response["data"]["markSetInProgress"]
-        print("Erreur lors du démarrage du match:", response.get("errors", "Unknown error"))
         return None
     def assign_station_to_set (self, set_id: str, station_id: str) -> Optional[Dict[str, Any]]:
         """Assigne une station à un set."""
@@ -271,7 +267,6 @@ class StartGG:
         response = self._make_request(query, variables)
         if response and "data" in response:
             return response["data"]["assignStation"]
-        print("Erreur lors de l'assignation de la station:", response.get("errors", "Unknown error"))
         return None
 
 

@@ -9,14 +9,28 @@ class Match:
         self.stationNumber = -1  # Default value for station number
         self.gameData = []
         self.number_of_games_to_win = bestOf_N - int(bestOf_N/2)  # Total number of games in the match
-
+        self.isComplete = False
+        self.charactersName = []  # List to store character names, if needed
+        self.characters = {}  # Dictionary to store character IDs and names
+        self.charactersIDbyName = {}  # Dictionary to store character names by ID, if needed
+    def set_characters(self, characters):
+        # Set the characters for the match
+        self.characters = {char['id']: char['name'] for char in characters}
+        self.charactersName = [char['name'] for char in characters]
+        self.charactersIDbyName = {char['name']: char['id'] for char in characters}
     def start_match(self):
         # Start the match using the StartGG API
         result = self.sgg_request.startMatch(self.matchId)
     def set_station(self, station_number):
         # Set the station number for the match
         self.stationNumber = station_number
-    def report_Match(self, isWinnerP1 : bool , characterP1_id : int, characterP2_id : int):
+    def report_Match(self, isWinnerP1 : bool , characterP1_name : int, characterP2_name: int):
+ 
+        p1_char_id = self.charactersIDbyName.get(characterP1_name, None)
+        p2_char_id = self.charactersIDbyName.get(characterP2_name, None)
+        print("Character P1 ID:", p1_char_id)
+        print("Character P2 ID:", p2_char_id)
+
         p1_Id = self.p1['id']
         p2_Id = self.p2['id']
         winner = self.p1 if isWinnerP1 else self.p2
@@ -24,8 +38,8 @@ class Match:
            'gameNum' : len(self.gameData) + 1,  # Commence à 1, pas à 0
            'winnerId': winner['id'],  # ID de l'entrant gagnant
               'selections': [
-                {'entrantId': p1_Id, 'characterId': characterP1_id},  # ID de l'entrant et ID du personnage
-                {'entrantId':  p2_Id, 'characterId': characterP2_id}   # ID de l'entrant et ID du personnage
+                {'entrantId': p1_Id, 'characterId': p1_char_id},  # ID de l'entrant et ID du personnage
+                {'entrantId':  p2_Id, 'characterId': p2_char_id}   # ID de l'entrant et ID du personnage
               ]
        }
         #Ajoute le nombre de game gagné au joueur gagnant
@@ -38,3 +52,4 @@ class Match:
            # Si tous les jeux sont terminés, on envoie le rapport de match
            result = self.sgg_request.update_match_score(self.matchId, self.gameData, self.gameData[-1]['winnerId'])
            self.gameData = []  # Réinitialise les données du match après l'envoi
+           self.isComplete = True  
