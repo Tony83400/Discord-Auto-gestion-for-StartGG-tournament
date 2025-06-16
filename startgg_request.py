@@ -56,6 +56,7 @@ class StartGG:
         """
         variables = {"slug": event_slug}
         response = self._make_request(query, variables)
+        # return response
         if response and "data" in response:
             return response["data"]["tournament"]
         return None
@@ -99,17 +100,11 @@ class StartGG:
                 nodes {
                     id
                     identifier
+                    round
                     slots {
                         entrant {
                             name
                             id
-                        }
-                        standing {
-                            stats {
-                                score {
-                                    value
-                                }
-                            }
                         }
                     }
 
@@ -265,6 +260,7 @@ class StartGG:
         """
         variables = {"setId": set_id, "stationId": station_id}
         response = self._make_request(query, variables)
+        print(response)
         if response and "data" in response:
             return response["data"]["assignStation"]
         return None

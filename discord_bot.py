@@ -73,10 +73,7 @@ async def test(ctx):
     myMatch = Match(p1, p2, 90324698, 3, StartGG(sggKey))
     myMatch.set_characters([
         {'id': 1271, 'name': 'Character1'},
-        {'id': 1272, 'name': 'Character2'},
-        {'id': 1273, 'name': 'Character3'},
-        {'id': 1274, 'name': 'Character4'},
-        {'id': 1275, 'name': 'Character5'}
+        {'id': 1277, 'name': 'Character2'},
     ])
     
     myMatch.set_station(1)
@@ -95,7 +92,7 @@ async def start_match(ctx , myMatch: Match):
     await ctx.send(f"**Match démarré** - {p1['name']} vs {p2['name']} (BO3)")
 
     # Boucle des games
-    for game_num in range(1, myMatch.number_of_games_to_win + 1):
+    for game_num in range(1, myMatch.bestOf_N + 1):
         # 1. Envoi et attente du report
         await ctx.send(f"**Game {game_num}** - En attente du report...")
         
@@ -109,7 +106,8 @@ async def start_match(ctx , myMatch: Match):
             )
             
             # 2. Traitement du résultat
-            if result["winner"] == p1['name']:
+            print(f"Résultat reçu pour Game {game_num}: {result}")
+            if result["isP1Winner"]:
                 myMatch.report_Match(True, result['p1_char'], result['p2_char'])
                 await ctx.send(f"✅ Game {game_num} reportée: {p1['name']} gagne")
             else:

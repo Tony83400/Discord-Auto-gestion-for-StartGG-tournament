@@ -8,6 +8,7 @@ class Match:
         self.sgg_request = startGG
         self.stationNumber = -1  # Default value for station number
         self.gameData = []
+        self.bestOf_N = bestOf_N  # Number of games in the match
         self.number_of_games_to_win = bestOf_N - int(bestOf_N/2)  # Total number of games in the match
         self.isComplete = False
         self.charactersName = []  # List to store character names, if needed
@@ -21,9 +22,11 @@ class Match:
     def start_match(self):
         # Start the match using the StartGG API
         result = self.sgg_request.startMatch(self.matchId)
-    def set_station(self, station_number):
+    def set_station(self, station_id):
         # Set the station number for the match
-        self.stationNumber = station_number
+        self.stationNumber = station_id
+        print(f"Setting station number: {station_id} for match ID: {self.matchId}")
+        self.sgg_request.assign_station_to_set(self.matchId, station_id)
     def report_Match(self, isWinnerP1 : bool , characterP1_name : int, characterP2_name: int):
  
         p1_char_id = self.charactersIDbyName.get(characterP1_name, None)
@@ -52,4 +55,4 @@ class Match:
            # Si tous les jeux sont terminés, on envoie le rapport de match
            result = self.sgg_request.update_match_score(self.matchId, self.gameData, self.gameData[-1]['winnerId'])
            self.gameData = []  # Réinitialise les données du match après l'envoi
-           self.isComplete = True  
+           self.isComplete = True

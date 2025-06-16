@@ -231,7 +231,7 @@ async def send_match_report(channel, player1, player2, characters):
             self.final_result = {
                 "p1_char": self.p1_char,
                 "p2_char": self.p2_char,
-                "winner": self.player1 if self.winner == "p1" else self.player2
+                "isP1Winner":  self.winner == "p1" # True si le joueur 1 a gagné
             }
             
             # Confirmation visuelle
