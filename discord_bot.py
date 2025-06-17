@@ -38,50 +38,6 @@ async def on_ready():
             print("Erreur lors de la création des salons")
 
 
-
-
-
-@bot.command()
-async def ping(ctx):
-    await ctx.send("Pong!")
-
-@bot.command()
-async def remove_match(ctx, match_number: str = "a"):
-    guild = ctx.guild
-    channel_name = f"match-{match_number}"
-    
-    # Trouve le salon à supprimer
-    channel = discord.utils.get(guild.text_channels, name=channel_name)
-    
-    if channel:
-        try:
-            await channel.delete()
-            await ctx.send(f"Salon {channel_name} supprimé avec succès.")
-        except discord.Forbidden:
-            await ctx.send("Erreur: Le bot n'a pas les permissions nécessaires pour supprimer ce salon.")
-        except discord.HTTPException:
-            await ctx.send("Erreur lors de la suppression du salon.")
-    else:
-        await ctx.send(f"Aucun salon trouvé avec le nom {channel_name}.")
-
-
-@bot.command()
-async def test(ctx):
-    p1 = {'id': 1, 'name': 'Player1', 'discordId': '1234567890', 'discordName': 'PlayerOne'}
-    p2 = {'id': 2, 'name': 'Player2', 'discordId': '0987654321', 'discordName': 'PlayerTwo'}
-    myMatch = Match(p1, p2, 90324698, 3, StartGG(sggKey))
-    myMatch.set_characters([
-        {'id': 1271, 'name': 'Character1'},
-        {'id': 1277, 'name': 'Character2'},
-    ])
-    
-    myMatch.set_station(1)
-    myMatch.start_match()
-    await start_match(ctx, myMatch)
-
-    
-
-
 async def start_match(ctx , myMatch: Match):
     """Commande pour gérer un match complet avec attente des reports"""
     # Initialisation
@@ -132,7 +88,7 @@ current_tournament = None
 # Nouvelles commandes à ajouter à ton bot
 
 @bot.command()
-async def setup_tournament(ctx, tournament_slug: str, event_id: int, phase_id: int, pool_id: int , best_of: int = 3):
+async def setup_tournament(ctx, tournament_slug: str, event_id: int, phase_id: int, pool_id: int , best_of: int ):
     """Configure un tournoi pour la gestion automatique"""
     global match_manager, current_tournament
     
@@ -145,9 +101,10 @@ async def setup_tournament(ctx, tournament_slug: str, event_id: int, phase_id: i
         tournament.select_event_phase(phase_id)
         tournament.select_pool(pool_id)
         tournament.set_best_of(best_of)
-        
+        tournament._set_player_list()  # Mettre à jour la liste des joueurs
         # Créer le gestionnaire de matchs
         match_manager = MatchManager(bot, tournament)
+        match_manager.player_list = tournament.DiscordIdForPlayer  # Mettre à jour la liste des joueurs dans le gestionnaire
         current_tournament = tournament
         
         # Afficher les infos
@@ -324,18 +281,4 @@ async def help_tournament(ctx):
     )
     
     await ctx.send(embed=embed)
-@bot.command()
-async def force_refresh(ctx):
-    """Force le rafraîchissement des matchs en attente"""
-    global match_manager
-    
-    if not match_manager:
-        await ctx.send("❌ Aucun gestionnaire configuré.")
-        return
-    
-    if await match_manager.refresh_pending_matches(ctx):
-        await ctx.send("🔄 Nouveaux matchs récupérés!")
-    else:
-        await ctx.send("ℹ️ Aucun nouveau match trouvé")
-
 bot.run(token)

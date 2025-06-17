@@ -18,6 +18,7 @@ class Tournament:
         self.selectedPhaseId = None
         self.selectedPoolId = None
         self.playerList = []
+        self.DiscordIdForPlayer = {}
         self.characterList = self.sgg_request.get_all_characters() #Peut etre changer pour d'autre jeux
         self.bestOf_N = 3  # Nombre de jeux par match, peut être modifié selon le tournoi
         result = self.sgg_request.get_tournament(slug)
@@ -49,6 +50,9 @@ class Tournament:
                         newPlayer['discordId'] = None
                         newPlayer['discordName'] = None
                     self.playerList.append(newPlayer)
+                for player in self.playerList:
+                    if player['discordId'] != None:
+                        self.DiscordIdForPlayer[player['name']] = player['discordId']
             else:
                 raise ValueError("No players found for the selected event.")
         else:
@@ -111,7 +115,8 @@ class Tournament:
         if matches:
             for match in matches[0]['sets']['nodes']:
                 entrants = match['slots']
-                if entrants[0]['entrant'] != None and entrants[1]['entrant'] != None:
+    
+                if entrants[0]['entrant'] != None and entrants[1]['entrant'] != None and match['stream'] == None and match['station'] == None:
                     final_matches.append(match)
                     
             final_matches = self.order_match(final_matches)

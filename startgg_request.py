@@ -107,6 +107,12 @@ class StartGG:
                             id
                         }
                     }
+                    stream {
+                        id
+                    }
+                    station {
+                        id
+                    }
 
                 }
             }

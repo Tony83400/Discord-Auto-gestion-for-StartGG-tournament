@@ -12,7 +12,7 @@ class MatchManager:
         self.active_matches: Dict[int, Dict] = {}  # station_number -> match_info
         self.pending_matches: List[Dict] = []  # Liste des matchs en attente
         self.is_running = False
-        self.last_refresh_time = 0  # Pour éviter trop de requêtes API
+        self.player_list = {}  # Dictionnaire pour stocker les joueurs et leurs IDs Discord
         
     async def initialize_matches(self, ctx):
         """Initialise la liste des matchs en attente"""
@@ -23,47 +23,6 @@ class MatchManager:
             return True
         except Exception as e:
             await ctx.send(f"❌ Erreur lors de la récupération des matchs: {e}")
-            return False
-    
-    async def refresh_pending_matches(self, ctx=None):
-        """Rafraîchit la liste des matchs en attente depuis start.gg"""
-        try:
-            import time
-            current_time = time.time()
-            
-            # Éviter de spam l'API (minimum 30 secondes entre les refresh)
-            if current_time - self.last_refresh_time < 30:
-                return False
-                
-            self.last_refresh_time = current_time
-            
-            # Récupérer les nouveaux matchs depuis start.gg
-            new_matches = self.tournament.get_matches(state=1)  # Matchs non commencés
-            
-            # Filtrer les matchs déjà en cours
-            active_match_ids = set()
-            for match_info in self.active_matches.values():
-                active_match_ids.add(match_info['sgg_match']['id'])
-            
-            # Filtrer les matchs déjà en attente
-            pending_match_ids = {match['id'] for match in self.pending_matches}
-            
-            # Ajouter seulement les nouveaux matchs
-            new_count = 0
-            for match in new_matches:
-                if match['id'] not in active_match_ids and match['id'] not in pending_match_ids:
-                    self.pending_matches.append(match)
-                    new_count += 1
-            
-            if ctx and new_count > 0:
-                await ctx.send(f"🔄 {new_count} nouveaux matchs détectés!")
-                
-            return new_count > 0
-            
-        except Exception as e:
-            if ctx:
-                await ctx.send(f"❌ Erreur lors du rafraîchissement: {e}")
-            print(f"Erreur refresh: {e}")
             return False
     
     async def start_match_processing(self, ctx):
@@ -89,27 +48,13 @@ class MatchManager:
     
     async def match_processing_loop(self, ctx):
         """Boucle principale qui gère l'attribution automatique des matchs"""
-        refresh_counter = 0
-        
-        while self.is_running:
+        while self.is_running and (self.pending_matches or self.active_matches):
             try:
-                # Vérifier les matchs terminés AVANT d'assigner de nouveaux matchs
-                await self.check_completed_matches(ctx)
-                
-                # Rafraîchir la liste des matchs périodiquement
-                refresh_counter += 1
-                if refresh_counter >= 6:  # Toutes les 30 secondes (6 x 5s)
-                    await self.refresh_pending_matches(ctx)
-                    refresh_counter = 0
-                
                 # Assigner de nouveaux matchs aux stations libres
                 await self.assign_pending_matches(ctx)
                 
-                # Vérifier s'il reste des matchs à traiter
-                if not self.pending_matches and not self.active_matches:
-                    # Dernier check pour voir s'il y a de nouveaux matchs
-                    if not await self.refresh_pending_matches(ctx):
-                        break
+                # Vérifier les matchs terminés
+                await self.check_completed_matches(ctx)
                 
                 # Attendre avant la prochaine vérification
                 await asyncio.sleep(5)
@@ -134,17 +79,12 @@ class MatchManager:
                     available_stations.append(station['number'])
             
             # Assigner un match par station disponible
-            assigned_count = 0
             for station_num in available_stations:
                 if not self.pending_matches:
                     break
                     
                 match_to_assign = self.pending_matches.pop(0)
                 await self.assign_match_to_station(ctx, match_to_assign, station_num)
-                assigned_count += 1
-                
-            if assigned_count > 0:
-                await ctx.send(f"📋 {assigned_count} match(s) assigné(s) aux stations")
                 
         except Exception as e:
             print(f"Erreur lors de l'assignation: {e}")
@@ -153,9 +93,9 @@ class MatchManager:
         """Assigne un match spécifique à une station"""
         try:
             # Créer l'objet Match
-            my_match = sggMatch_to_MyMatch(sgg_match, self.tournament.bestOf_N)
+            my_match = sggMatch_to_MyMatch(sgg_match, self.tournament.bestOf_N)  # BO3 par défaut
             
-            # Configurer les personnages
+            # Configurer les personnages (tu peux adapter selon tes besoins)
             character_names = [char['name'] for char in self.tournament.characterList]
             my_match.set_characters(self.tournament.characterList)
             
@@ -178,8 +118,7 @@ class MatchManager:
                 'match_object': my_match,
                 'sgg_match': sgg_match,
                 'channel': channel,
-                'task': None,
-                'start_time': asyncio.get_event_loop().time()
+                'task': None
             }
             
             # Lancer le match en arrière-plan
@@ -202,21 +141,37 @@ class MatchManager:
         raise ValueError(f"Station {station_number} non trouvée")
     
     async def create_match_channel(self, guild, my_match: Match, station_number: int):
-        """Crée un canal pour le match"""
+        """Crée un canal pour le match uniquement visible par les joueurs concernés"""
         try:
             # Trouve ou crée la catégorie des matchs
             category = discord.utils.get(guild.categories, name="⚔ Matchs en cours")
             if not category:
                 category = await guild.create_category("⚔ Matchs en cours")
-            
-            # Crée le canal
+
+            # Définir les permissions
+            overwrites = {
+                guild.default_role: discord.PermissionOverwrite(view_channel=False)  # cacher pour tous
+            }
+            p1_name = my_match.p1['name']
+            p2_name = my_match.p2['name']
+            print(self.player_list)
+            member1 = guild.get_member(int(self.player_list[p1_name])) if p1_name in self.player_list else None
+            member2 = guild.get_member(int(self.player_list[p2_name])) if p2_name in self.player_list else None
+            if member1:
+                overwrites[member1] = discord.PermissionOverwrite(view_channel=True)
+            if member2:
+                overwrites[member2] = discord.PermissionOverwrite(view_channel=True)
+            # Crée le canal avec les permissions
             channel_name = f"station-{station_number}"
-            channel = await guild.create_text_channel(channel_name, category=category)
-            
+            channel = await guild.create_text_channel(channel_name, category=category, overwrites=overwrites)
+
             return channel
         except Exception as e:
-            print(f"Erreur création canal: {e}")
+            print(f"Erreur lors de la création du canal pour le match: {e}")
             return None
+
+  
+
     
     async def run_match(self, channel, my_match: Match, station_number: int):
         """Exécute un match complet"""
@@ -241,7 +196,7 @@ class MatchManager:
                 await channel.send(f"**Game {game_num}** - En attente du report...")
                 
                 try:
-                    # Attendre le report avec timeout
+                    # Attendre le report avec timeout plus long
                     result = await asyncio.wait_for(
                         send_match_report(
                             channel=channel,
@@ -264,37 +219,38 @@ class MatchManager:
                         winner_name = p1_name if my_match.p1_score > my_match.p2_score else p2_name
                         await channel.send(f"🏆 **Match terminé !** Vainqueur: **{winner_name}**")
                         
-                        # IMPORTANT: Reporter le résultat sur start.gg
-                        await self.report_match_to_startgg(my_match, channel)
+                        # NOUVEAU: Programmer la suppression du channel dans 1 minute
+                        await channel.send("🕐 Ce channel sera supprimé dans 1 minute...")
+                        asyncio.create_task(self.schedule_channel_deletion(channel, station_number))
                         break
                         
                 except asyncio.TimeoutError:
                     await channel.send("⌛ Temps écoulé pour ce game - Match en pause")
+                    # Ne pas annuler complètement, laisser la possibilité de reprendre
                     return
                     
         except Exception as e:
             await channel.send(f"❌ Erreur pendant le match: {e}")
             print(f"Erreur match: {e}")
-        finally:
-            # Marquer le match comme terminé
-            if station_number in self.active_matches:
-                self.active_matches[station_number]['completed'] = True
     
-    async def report_match_to_startgg(self, my_match: Match, channel):
-        """Reporte le résultat du match sur start.gg"""
+    async def schedule_channel_deletion(self, channel, station_number: int):
+        """Programme la suppression du channel après 1 minute"""
         try:
-            # Cette fonction devrait être implémentée dans votre classe Match ou Tournament
-            # Elle doit faire l'appel API pour reporter le résultat
-            success = my_match.submit_to_startgg()  # À implémenter
+            # Attendre 1 minute
+            await asyncio.sleep(60)
             
-            if success:
-                await channel.send("✅ Résultat reporté sur start.gg")
-            else:
-                await channel.send("⚠️ Erreur lors du report sur start.gg")
+            # Supprimer le channel
+            if channel:
+                await channel.delete()
+                print(f"Channel station-{station_number} supprimé automatiquement")
                 
+        except discord.NotFound:
+            # Le channel a déjà été supprimé
+            print(f"Channel station-{station_number} déjà supprimé")
+        except discord.Forbidden:
+            print(f"Pas les permissions pour supprimer le channel station-{station_number}")
         except Exception as e:
-            await channel.send(f"❌ Erreur report start.gg: {e}")
-            print(f"Erreur report start.gg: {e}")
+            print(f"Erreur lors de la suppression du channel station-{station_number}: {e}")
     
     async def check_completed_matches(self, ctx):
         """Vérifie et nettoie les matchs terminés"""
@@ -305,7 +261,7 @@ class MatchManager:
             my_match = match_info['match_object']
             
             # Vérifier si le match est terminé
-            if (task and task.done()) or my_match.isComplete or match_info.get('completed', False):
+            if task and task.done() or my_match.isComplete:
                 completed_stations.append(station_num)
         
         # Nettoyer les matchs terminés
@@ -327,30 +283,13 @@ class MatchManager:
                         del station['current_match']
                     break
             
-            # Programmer la suppression du canal
-            if match_info.get('channel'):
-                channel = match_info['channel']
-                asyncio.create_task(self.delayed_channel_cleanup(channel))
-            
-            # Nettoyer la liste des matchs actifs
+            # Nettoyer la liste des matchs actifs (le channel sera supprimé automatiquement)
             del self.active_matches[station_number]
             
-            # Forcer un refresh des matchs après completion
-            await self.refresh_pending_matches(ctx)
-            
-            if ctx:
-                await ctx.send(f"🔄 Station {station_number} libérée - Recherche de nouveaux matchs...")
+            await ctx.send(f"🔄 Station {station_number} libérée")
             
         except Exception as e:
             print(f"Erreur nettoyage: {e}")
-    
-    async def delayed_channel_cleanup(self, channel):
-        """Supprime un canal après un délai"""
-        try:
-            await asyncio.sleep(300)  # 5 minutes de délai
-            await channel.delete()
-        except:
-            pass  # Canal peut-être déjà supprimé
     
     async def get_status(self, ctx):
         """Affiche le statut actuel du gestionnaire"""
