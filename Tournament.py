@@ -153,7 +153,8 @@ class Tournament:
         if self.station:
             for s in self.station:
                 if s['number'] == number:
-                    raise ValueError(f"Station {number} already exists.")
+                    print(f"Station {number} already exists.")
+                    return
             id = self.sgg_request.create_station(self.id, number)
             new_station = {
                 'number': number,
@@ -176,7 +177,8 @@ class Tournament:
                         return
                     else:
                         raise ValueError(f"Station {number} is currently in use and cannot be deleted.")
-            raise ValueError(f"Station {number} does not exist.")
+            print(f"Station {number} does not exist.")
+            return
         else:
             raise ValueError("No stations available for this tournament.")
     def find_station_available(self):
