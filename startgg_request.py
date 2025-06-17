@@ -36,6 +36,7 @@ class StartGG:
         query = """
  query Tournament($slug: String!) {
      tournament(slug: $slug) {
+        id
         name
         events {
             id
@@ -270,3 +271,29 @@ class StartGG:
         if response and "data" in response:
             return response["data"]["assignStation"]
         return None
+    def create_station(self, tournament_id: str, station_number: int) -> Optional[Dict[str, Any]]:
+        """Crée une nouvelle station pour un événement."""
+        query = """
+        mutation UpsertStation( $tournamentId: ID!, $fields: StationUpsertInput!) {
+        upsertStation(tournamentId: $tournamentId , fields: $fields) {
+            id
+        }
+    }
+
+
+        """
+        variables = {"tournamentId": tournament_id, "fields": { "number":station_number }}
+        response = self._make_request(query, variables)
+        if response and "data" in response:
+            return response["data"]["createStation"]['id']
+        return None
+    def delete_station(self, station_id: str) -> Optional[Dict[str, Any]]:
+        """Supprime une station."""
+        query = """
+        mutation DeleteStation($stationId: ID!) {
+            deleteStation(stationId: $stationId) 
+        }
+        """
+        variables = {"stationId": station_id}
+        response = self._make_request(query, variables)
+        return response

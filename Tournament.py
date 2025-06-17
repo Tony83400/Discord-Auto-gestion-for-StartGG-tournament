@@ -19,12 +19,14 @@ class Tournament:
         self.selectedPoolId = None
         self.playerList = []
         self.DiscordIdForPlayer = {}
+        self.id = None
         self.characterList = self.sgg_request.get_all_characters() #Peut etre changer pour d'autre jeux
         self.bestOf_N = 3  # Nombre de jeux par match, peut être modifié selon le tournoi
         result = self.sgg_request.get_tournament(slug)
         if result:
             self.events = result.get('events', [])
             self.selectedEvent = None
+            self.id = result.get('id')
             station = result.get('stations', {})['nodes']
             for s in station:
                 s['isUsed'] = False  # Initialiser l'état de la station
@@ -147,6 +149,36 @@ class Tournament:
                     return match
                 else:
                     raise ValueError(f"Station {station_number} is already in use.")
+    def create_station(self, number):
+        if self.station:
+            for s in self.station:
+                if s['number'] == number:
+                    raise ValueError(f"Station {number} already exists.")
+            id = self.sgg_request.create_station(self.id, number)
+            new_station = {
+                'number': number,
+                'isUsed': False,
+                'id': id,  # ID will be set when the station is created in StartGG
+                'match': None
+            }
+            self.station.append(new_station)
+            print(f"Station {number} created successfully.")
+        else:
+            raise ValueError("No stations available for this tournament.")
+    def delete_station(self, number):
+        if self.station:
+            for s in self.station:
+                if s['number'] == number:
+                    if not s['isUsed']:
+                        self.sgg_request.delete_station(s['id'])
+                        self.station.remove(s)
+                        print(f"Station {number} deleted successfully.")
+                        return
+                    else:
+                        raise ValueError(f"Station {number} is currently in use and cannot be deleted.")
+            raise ValueError(f"Station {number} does not exist.")
+        else:
+            raise ValueError("No stations available for this tournament.")
     def find_station_available(self):
         if self.station:
             print(self.station)

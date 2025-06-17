@@ -88,7 +88,7 @@ current_tournament = None
 # Nouvelles commandes à ajouter à ton bot
 
 @bot.command()
-async def setup_tournament(ctx, tournament_slug: str, event_id: int, phase_id: int, pool_id: int , best_of: int ):
+async def setup_tournament(ctx, tournament_slug: str, event_id: int, phase_id: int, pool_id: int , best_of: int , setup_number : int):
     """Configure un tournoi pour la gestion automatique"""
     global match_manager, current_tournament
     
@@ -102,6 +102,8 @@ async def setup_tournament(ctx, tournament_slug: str, event_id: int, phase_id: i
         tournament.select_pool(pool_id)
         tournament.set_best_of(best_of)
         tournament._set_player_list()  # Mettre à jour la liste des joueurs
+        for i in range(setup_number):
+            tournament.create_station(i + 1)  # Créer les stations
         # Créer le gestionnaire de matchs
         match_manager = MatchManager(bot, tournament)
         match_manager.player_list = tournament.DiscordIdForPlayer  # Mettre à jour la liste des joueurs dans le gestionnaire
@@ -281,4 +283,29 @@ async def help_tournament(ctx):
     )
     
     await ctx.send(embed=embed)
+@bot.command()
+async def clean_all_channels(ctx):
+    """Nettoie tous les messages du salon"""
+   #Supprime tout les channel stations
+    for channel in ctx.guild.channels:
+        if channel.name.startswith("station-"):
+            try:
+                await channel.delete()
+                print(f"Channel {channel.name} supprimé.")
+            except discord.Forbidden:
+                print(f"Permission refusée pour supprimer le channel {channel.name}.")
+            except discord.HTTPException as e:
+                print(f"Erreur lors de la suppression du channel {channel.name}: {e}")
+    
+    #Supprime la catégorie ⚔ Matchs en cours
+    category = discord.utils.get(ctx.guild.categories, name="⚔ Matchs en cours")
+    if category:
+        try:
+            await category.delete()
+            print(f"Catégorie {category.name} supprimée.")
+        except discord.Forbidden:
+            print(f"Permission refusée pour supprimer la catégorie {category.name}.")
+        except discord.HTTPException as e:
+            print(f"Erreur lors de la suppression de la catégorie {category.name}: {e}")
+
 bot.run(token)
