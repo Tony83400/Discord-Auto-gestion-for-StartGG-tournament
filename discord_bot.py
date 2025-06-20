@@ -160,6 +160,7 @@ async def stop_matches(interaction: discord.Interaction):
                 station = current_tournament.station[i]
                 # Forcer la suppression même si en cours d'utilisation
                 try:
+                    station['isUsed'] = False
                     current_tournament.delete_station(i + 1)  # i + 1 car les stations sont numérotées à partir de 1
                     stations_removed += 1
                 except Exception as e:
