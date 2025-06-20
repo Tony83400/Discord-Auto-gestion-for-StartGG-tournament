@@ -267,7 +267,6 @@ class StartGG:
         """
         variables = {"setId": set_id, "stationId": station_id}
         response = self._make_request(query, variables)
-        print(response)
         if response and "data" in response:
             return response["data"]["assignStation"]
         return None
@@ -285,7 +284,7 @@ class StartGG:
         variables = {"tournamentId": tournament_id, "fields": { "number":station_number }}
         response = self._make_request(query, variables)
         if response and "data" in response:
-            return response["data"]["createStation"]['id']
+            return response["data"]["upsertStation"]['id']
         return None
     def delete_station(self, station_id: str) -> Optional[Dict[str, Any]]:
         """Supprime une station."""
@@ -297,3 +296,17 @@ class StartGG:
         variables = {"stationId": station_id}
         response = self._make_request(query, variables)
         return response
+    def reset_set(self, set_id: str) -> Optional[Dict[str, Any]]:
+        """Réinitialise un set."""
+        query = """
+        mutation ResetSet($setId: ID!) {
+            resetSet(setId: $setId) {
+                id
+            }
+        }
+        """
+        variables = {"setId": set_id}
+        response = self._make_request(query, variables)
+        if response and "data" in response:
+            return True
+        return False

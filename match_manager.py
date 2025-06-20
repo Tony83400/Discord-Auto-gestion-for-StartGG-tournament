@@ -14,47 +14,97 @@ class MatchManager:
         self.is_running = False
         self.player_list = {}  # Dictionnaire pour stocker les joueurs et leurs IDs Discord
         
-    async def initialize_matches(self, ctx):
+    async def initialize_matches(self, interaction):
         """Initialise la liste des matchs en attente"""
         try:
             matches = self.tournament.get_matches(state=1)  # Matchs non commencés
             self.pending_matches = matches.copy()
-            await ctx.send(f"🎯 {len(self.pending_matches)} matchs en attente de traitement")
+            await interaction.followup.send(f"🎯 {len(self.pending_matches)} matchs en attente de traitement")
             return True
         except Exception as e:
-            await ctx.send(f"❌ Erreur lors de la récupération des matchs: {e}")
+            await interaction.followup.send(f"❌ Erreur lors de la récupération des matchs: {e}")
             return False
+    def reset_all_match(self):
+        for id in self.active_matches:
+            match = self.active_matches[id]
+            match_id = match['sgg_match']['id']
+            self.tournament.sgg_request.reset_set(match_id)
+
+    async def refresh_matches_list(self, interaction=None):
+        """Actualise la liste des matchs en attente depuis l'API"""
+        try:
+            # Récupérer les nouveaux matchs disponibles
+            new_matches = self.tournament.get_matches(state=1)  # Matchs non commencés
+            
+            # Filtrer les matchs qui ne sont pas déjà en cours ou dans la liste d'attente
+            current_match_ids = set()
+            
+            # Ajouter les IDs des matchs en cours
+            for match_info in self.active_matches.values():
+                current_match_ids.add(match_info['sgg_match']['id'])
+            
+            # Ajouter les IDs des matchs en attente
+            for pending_match in self.pending_matches:
+                current_match_ids.add(pending_match['id'])
+            
+            # Ajouter uniquement les nouveaux matchs
+            new_pending_matches = []
+            for match in new_matches:
+                if match['id'] not in current_match_ids:
+                    new_pending_matches.append(match)
+                    self.pending_matches.append(match)
+            
+            if new_pending_matches and interaction:
+                await interaction.followup.send(f"🔄 {len(new_pending_matches)} nouveaux matchs détectés et ajoutés à la file")
+            
+            return len(new_pending_matches)
+            
+        except Exception as e:
+            print(f"Erreur lors de l'actualisation des matchs: {e}")
+            if interaction:
+                await interaction.followup.send(f"❌ Erreur lors de l'actualisation: {e}")
+            return 0
     
-    async def start_match_processing(self, ctx):
+    async def start_match_processing(self, interaction):
         """Démarre le processus automatique de gestion des matchs"""
         if self.is_running:
-            await ctx.send("⚠️ Le gestionnaire de matchs est déjà en cours d'exécution")
+            await interaction.followup.send("⚠️ Le gestionnaire de matchs est déjà en cours d'exécution")
             return
             
         if not self.pending_matches:
-            if not await self.initialize_matches(ctx):
+            if not await self.initialize_matches(interaction):
                 return
         
         self.is_running = True
-        await ctx.send("🚀 Démarrage du gestionnaire automatique de matchs")
+        await interaction.followup.send("🚀 Démarrage du gestionnaire automatique de matchs")
         
         # Lancer la boucle principale
-        asyncio.create_task(self.match_processing_loop(ctx))
+        asyncio.create_task(self.match_processing_loop(interaction))
     
-    async def stop_match_processing(self, ctx):
+    async def stop_match_processing(self, interaction):
         """Arrête le processus automatique"""
         self.is_running = False
-        await ctx.send("⏹️ Arrêt du gestionnaire de matchs demandé")
+        await interaction.followup.send("⏹️ Arrêt du gestionnaire de matchs demandé")
     
-    async def match_processing_loop(self, ctx):
+    async def match_processing_loop(self, interaction):
         """Boucle principale qui gère l'attribution automatique des matchs"""
+        refresh_counter = 0
+        
         while self.is_running and (self.pending_matches or self.active_matches):
             try:
                 # Assigner de nouveaux matchs aux stations libres
-                await self.assign_pending_matches(ctx)
+                await self.assign_pending_matches(interaction)
                 
                 # Vérifier les matchs terminés
-                await self.check_completed_matches(ctx)
+                await self.check_completed_matches(interaction)
+                
+                # Actualiser la liste des matchs toutes les 30 secondes (6 cycles de 5 secondes)
+                refresh_counter += 1
+                if refresh_counter >= 6:
+                    new_matches_count = await self.refresh_matches_list()
+                    if new_matches_count > 0:
+                        print(f"Nouveaux matchs détectés: {new_matches_count}")
+                    refresh_counter = 0
                 
                 # Attendre avant la prochaine vérification
                 await asyncio.sleep(5)
@@ -64,9 +114,9 @@ class MatchManager:
                 await asyncio.sleep(10)
         
         self.is_running = False
-        await ctx.send("✅ Tous les matchs ont été traités!")
+        await interaction.followup.send("✅ Tous les matchs ont été traités!")
     
-    async def assign_pending_matches(self, ctx):
+    async def assign_pending_matches(self, interaction):
         """Assigne les matchs en attente aux stations libres"""
         if not self.pending_matches:
             return
@@ -84,12 +134,12 @@ class MatchManager:
                     break
                     
                 match_to_assign = self.pending_matches.pop(0)
-                await self.assign_match_to_station(ctx, match_to_assign, station_num)
+                await self.assign_match_to_station(interaction, match_to_assign, station_num)
                 
         except Exception as e:
             print(f"Erreur lors de l'assignation: {e}")
     
-    async def assign_match_to_station(self, ctx, sgg_match, station_number: int):
+    async def assign_match_to_station(self, interaction, sgg_match, station_number: int):
         """Assigne un match spécifique à une station"""
         try:
             # Créer l'objet Match
@@ -111,7 +161,7 @@ class MatchManager:
                     break
             
             # Créer un canal pour ce match
-            channel = await self.create_match_channel(ctx.guild, my_match, station_number)
+            channel = await self.create_match_channel(interaction.guild, my_match, station_number)
             
             # Stocker les infos du match actif
             self.active_matches[station_number] = {
@@ -128,10 +178,19 @@ class MatchManager:
             # Notification
             p1_name = sgg_match['slots'][0]['entrant']['name']
             p2_name = sgg_match['slots'][1]['entrant']['name']
-            await ctx.send(f"🎮 Match assigné à la station {station_number}: **{p1_name}** vs **{p2_name}**")
+            
+            # Utiliser followup si la réponse initiale a déjà été envoyée, sinon utiliser response
+            try:
+                await interaction.followup.send(f"🎮 Match assigné à la station {station_number}: **{p1_name}** vs **{p2_name}**")
+            except:
+                # Si followup échoue, essayer d'envoyer dans le channel où la commande a été exécutée
+                await interaction.channel.send(f"🎮 Match assigné à la station {station_number}: **{p1_name}** vs **{p2_name}**")
             
         except Exception as e:
-            await ctx.send(f"❌ Erreur lors de l'assignation du match: {e}")
+            try:
+                await interaction.followup.send(f"❌ Erreur lors de l'assignation du match: {e}")
+            except:
+                await interaction.channel.send(f"❌ Erreur lors de l'assignation du match: {e}")
     
     def get_station_id_by_number(self, station_number: int) -> str:
         """Récupère l'ID de la station par son numéro"""
@@ -154,7 +213,6 @@ class MatchManager:
             }
             p1_name = my_match.p1['name']
             p2_name = my_match.p2['name']
-            print(self.player_list)
             member1 = guild.get_member(int(self.player_list[p1_name])) if p1_name in self.player_list else None
             member2 = guild.get_member(int(self.player_list[p2_name])) if p2_name in self.player_list else None
             if member1:
@@ -170,9 +228,6 @@ class MatchManager:
             print(f"Erreur lors de la création du canal pour le match: {e}")
             return None
 
-  
-
-    
     async def run_match(self, channel, my_match: Match, station_number: int):
         """Exécute un match complet"""
         try:
@@ -252,7 +307,7 @@ class MatchManager:
         except Exception as e:
             print(f"Erreur lors de la suppression du channel station-{station_number}: {e}")
     
-    async def check_completed_matches(self, ctx):
+    async def check_completed_matches(self, interaction):
         """Vérifie et nettoie les matchs terminés"""
         completed_stations = []
         
@@ -266,9 +321,9 @@ class MatchManager:
         
         # Nettoyer les matchs terminés
         for station_num in completed_stations:
-            await self.cleanup_completed_match(ctx, station_num)
+            await self.cleanup_completed_match(interaction, station_num)
     
-    async def cleanup_completed_match(self, ctx, station_number: int):
+    async def cleanup_completed_match(self, interaction, station_number: int):
         """Nettoie un match terminé et libère la station"""
         try:
             match_info = self.active_matches.get(station_number)
@@ -286,12 +341,21 @@ class MatchManager:
             # Nettoyer la liste des matchs actifs (le channel sera supprimé automatiquement)
             del self.active_matches[station_number]
             
-            await ctx.send(f"🔄 Station {station_number} libérée")
+            # NOUVEAU: Actualiser la liste des matchs après avoir libéré une station
+            await self.refresh_matches_list()
+            
+            # Essayer d'utiliser followup en premier, puis channel si ça échoue
+            try:
+                await interaction.followup.send(f"🔄 Station {station_number} libérée")
+            except:
+                # Si l'interaction n'est plus valide, utiliser le channel principal
+                if hasattr(interaction, 'channel'):
+                    await interaction.channel.send(f"🔄 Station {station_number} libérée")
             
         except Exception as e:
             print(f"Erreur nettoyage: {e}")
     
-    async def get_status(self, ctx):
+    async def get_status(self, interaction):
         """Affiche le statut actuel du gestionnaire"""
         embed = discord.Embed(
             title="📊 Statut du Gestionnaire de Matchs",
@@ -331,4 +395,5 @@ class MatchManager:
                 inline=False
             )
         
-        await ctx.send(embed=embed)
+        await interaction.followup.send(embed=embed)
+        

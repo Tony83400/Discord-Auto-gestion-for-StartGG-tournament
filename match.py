@@ -33,8 +33,6 @@ class Match:
  
         p1_char_id = self.charactersIDbyName.get(characterP1_name, None)
         p2_char_id = self.charactersIDbyName.get(characterP2_name, None)
-        print("Character P1 ID:", p1_char_id)
-        print("Character P2 ID:", p2_char_id)
 
         p1_Id = self.p1['id']
         p2_Id = self.p2['id']

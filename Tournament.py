@@ -65,7 +65,7 @@ class Tournament:
                 self.selectedEvent = event
                 self._set_player_list()
                 return
-        raise ValueError(f"Event with slug '{event_id}' not found in tournament '{self.slug}'.")
+        raise ValueError(f"Event with id '{event_id}' not found in tournament '{self.slug}'.")
     def set_best_of(self, bestOf_N: int):
         if bestOf_N > 0:
             self.bestOf_N = bestOf_N
@@ -92,7 +92,6 @@ class Tournament:
             raise ValueError("No event selected. Please select an event first.")
     def order_match(self,matchList):
         if not matchList:
-            print("No matches to order.")
             return []
         def custom_sort_key(item):
             round_val = item['round']
@@ -118,7 +117,7 @@ class Tournament:
             for match in matches[0]['sets']['nodes']:
                 entrants = match['slots']
     
-                if entrants[0]['entrant'] != None and entrants[1]['entrant'] != None and match['stream'] == None and match['station'] == None:
+                if entrants[0]['entrant'] != None and entrants[1]['entrant'] != None and match['stream'] == None:
                     final_matches.append(match)
                     
             final_matches = self.order_match(final_matches)
@@ -137,7 +136,6 @@ class Tournament:
         if self.selectedPoolId == None:
             raise ValueError("No pool selected. Please select an pool first.")
         myMatch = sggMatch_to_MyMatch(match, self.bestOf_N)
-        print(self.station)
         for s in self.station:
             if s['number'] == station_number:
                 if s['isUsed'] == False:
@@ -150,22 +148,27 @@ class Tournament:
                 else:
                     raise ValueError(f"Station {station_number} is already in use.")
     def create_station(self, number):
-        if self.station:
+        if not self.station:
+            self.station = []
+        else :
             for s in self.station:
                 if s['number'] == number:
                     print(f"Station {number} already exists.")
                     return
-            id = self.sgg_request.create_station(self.id, number)
-            new_station = {
-                'number': number,
-                'isUsed': False,
-                'id': id,  # ID will be set when the station is created in StartGG
-                'match': None
-            }
-            self.station.append(new_station)
-            print(f"Station {number} created successfully.")
-        else:
-            raise ValueError("No stations available for this tournament.")
+        id = self.sgg_request.create_station(self.id, number)
+        if id is None:
+            print(f"Station {number} already exists.")
+            return
+        new_station = {
+            'number': number,
+            'isUsed': False,
+            'id': id,  # ID will be set when the station is created in StartGG
+            'match': None
+        }
+        self.station.append(new_station)
+        print(f"Station {number} created successfully.")
+        return new_station
+       
     def delete_station(self, number):
         if self.station:
             for s in self.station:
@@ -176,20 +179,23 @@ class Tournament:
                         print(f"Station {number} deleted successfully.")
                         return
                     else:
-                        raise ValueError(f"Station {number} is currently in use and cannot be deleted.")
+                        print(f"Station {number} is currently in use and cannot be deleted.")
+                        return
             print(f"Station {number} does not exist.")
             return
         else:
-            raise ValueError("No stations available for this tournament.")
+            print("No stations available to delete.")
+            return
     def find_station_available(self):
         if self.station:
-            print(self.station)
             for s in self.station:
                 if not s['isUsed']:
                     return s['number']
-            raise ValueError("No available stations found.")
+            print("No available stations found.")
+            return None
         else:
-            raise ValueError("No stations available for this tournament.")
+            print("No stations available.")
+            return None
 def sggMatch_to_MyMatch(match, bestOf_N = 3):
     p1 = match['slots'][0]['entrant']
     p2 = match['slots'][1]['entrant']
