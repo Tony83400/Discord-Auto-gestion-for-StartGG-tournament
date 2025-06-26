@@ -1,4 +1,3 @@
-from startgg_request import StartGG
 
 class Match:
     def __init__(self, p1,p2 , matchId , bestOf_N , startGG):

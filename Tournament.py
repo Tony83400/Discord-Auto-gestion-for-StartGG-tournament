@@ -13,6 +13,7 @@ class Tournament:
         self.sgg_request = StartGG(sggKey)
         self.events = None
         self.selectedEvent = None
+        self.name= None
         self.station = None
         self.IsAdmin = None
         self.selectedPhaseId = None
@@ -20,17 +21,15 @@ class Tournament:
         self.playerList = []
         self.DiscordIdForPlayer = {}
         self.id = None
+        self.numAttendees = 0
         self.characterList = self.sgg_request.get_all_characters() #Peut etre changer pour d'autre jeux
         self.bestOf_N = 3  # Nombre de jeux par match, peut être modifié selon le tournoi
         result = self.sgg_request.get_tournament(slug)
         if result:
+            self.name = result.get('name')
             self.events = result.get('events', [])
             self.selectedEvent = None
             self.id = result.get('id')
-            station = result.get('stations', {})['nodes']
-            for s in station:
-                s['isUsed'] = False  # Initialiser l'état de la station
-            self.station = station
             self.IsAdmin = result.get('admins', []) != None
         else:
             raise ValueError(f"Tournament with slug '{slug}' not found.")
@@ -60,12 +59,7 @@ class Tournament:
         else:
             raise ValueError("No event selected. Please select an event first.")
     def select_event(self, event_id :int):
-        for event in self.events:
-            if event['id'] == event_id:
-                self.selectedEvent = event
-                self._set_player_list()
-                return
-        raise ValueError(f"Event with id '{event_id}' not found in tournament '{self.slug}'.")
+        self.selectedEvent = self.sgg_request.get_event_phases(event_id)
     def set_best_of(self, bestOf_N: int):
         if bestOf_N > 0:
             self.bestOf_N = bestOf_N

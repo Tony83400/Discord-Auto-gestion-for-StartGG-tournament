@@ -41,7 +41,7 @@ class StartGG:
         events {
             id
             name
-            numEntrants
+            numEntrants 
         }
         stations(perPage: 500) {
             nodes {
@@ -85,7 +85,7 @@ class StartGG:
         variables = {"eventId": event_id}
         response = self._make_request(query, variables)
         if response and "data" in response:
-            return response["data"]["event"]["phases"]
+            return response["data"]["event"]
         return None
     
     #Récupère les matchs d'une phase spécifique

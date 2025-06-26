@@ -11,10 +11,10 @@ import traceback
 import discord
 from discord.ext import commands
 from discord import app_commands
-from match_report import send_match_report
 from startgg_request import StartGG
 from match import Match
 from tournament import Tournament
+from config_tournament_view import TournamentModal, TournamentView
 
 load_dotenv()  # Charge le fichier .env
 
@@ -32,7 +32,6 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     print(f"Bot connecté en tant que {bot.user.name} ({bot.user.id})")
-    
     # Synchroniser les commandes slash
     try:
         synced = await bot.tree.sync()
@@ -51,50 +50,49 @@ async def on_ready():
         except discord.HTTPException:
             print("Erreur lors de la création des salons")
 
-# Conversion des commandes en slash commands
 
 @bot.tree.command(name="setup_tournament", description="Configure un tournoi pour la gestion automatique")
-@app_commands.describe(
-    tournament_slug="Slug du tournoi (ex: tournament-name-1)",
-    event_id="ID de l'événement",
-    phase_id="ID de la phase",
-    pool_id="ID de la pool",
-    best_of="Format du match (ex: 3 pour BO3)",
-    setup_number="Nombre de stations à créer"
-)
-async def setup_tournament(interaction: discord.Interaction, tournament_slug: str, event_id: int, phase_id: int, pool_id: int, best_of: int, setup_number: int):
+async def setup_tournament(interaction: discord.Interaction):
     """Configure un tournoi pour la gestion automatique"""
-    global match_manager, current_tournament
+    modal = TournamentModal()
+    await interaction.response.send_modal(modal)
+    # global match_manager, current_tournament
     
-    await interaction.response.defer()
-    
-    try:
-        await interaction.followup.send(f"⚙️ Configuration du tournoi: {tournament_slug}")
         
-        # Créer l'objet tournament
-        tournament = Tournament(tournament_slug)
-        tournament.select_event(event_id)
-        tournament.select_event_phase(phase_id)
-        tournament.select_pool(pool_id)
-        tournament.set_best_of(best_of)
-        tournament._set_player_list()  # Mettre à jour la liste des joueurs
-        for i in range(setup_number):
-            tournament.create_station(i + 1)  # Créer les stations
-            print(f"Station {i + 1} créée avec succès")
+    # # Créer l'objet tournament
+    # modal = TournamentModal()
+    # await interaction.response.send_modal(modal)
+    # tournament_slug = modal.tournament_link.value[4]
+    # tournament = Tournament(tournament_slug)
+    # if tournament.id is None:
+    #     await interaction.followup.send("❌ Tournoi non trouvé. Vérifiez le lien et réessayez.")
+    #     return
+    # if tournament.IsAdmin == False :
+    #     await interaction.followup.send("❌ La clé startgg assoscié doit être amidn pour gerer ce tournoi.")
+    #     return
+    # view = TournamentView()
+    # await interaction.followup.send("🔧 Configuration du tournoi en cours...", view=view, ephemeral=True)
+    # tournament.select_event(event_id)
+    # tournament.select_event_phase(phase_id)
+    # tournament.select_pool(pool_id)
+    # tournament.set_best_of(best_of)
+    # tournament._set_player_list()  # Mettre à jour la liste des joueurs
+    # for i in range(setup_number):
+    #     tournament.create_station(i + 1)  # Créer les stations
+    #     print(f"Station {i + 1} créée avec succès")
 
-        # Créer le gestionnaire de matchs
-        match_manager = MatchManager(bot, tournament)
-        match_manager.player_list = tournament.DiscordIdForPlayer  # Mettre à jour la liste des joueurs dans le gestionnaire
-        current_tournament = tournament
+    # # Créer le gestionnaire de matchs
+    # match_manager = MatchManager(bot, tournament)
+    # match_manager.player_list = tournament.DiscordIdForPlayer  # Mettre à jour la liste des joueurs dans le gestionnaire
+    # current_tournament = tournament
+    
+    # # Afficher les infos
+    # stations_count = len([s for s in tournament.station if not s['isUsed']])
+    # await interaction.followup.send(f"✅ Tournoi configuré!\n"
+    #                 f"📊 Événement: {tournament.selectedEvent['name']}\n"
+    #                 f"🎮 Stations disponibles: {stations_count}")
         
-        # Afficher les infos
-        stations_count = len([s for s in tournament.station if not s['isUsed']])
-        await interaction.followup.send(f"✅ Tournoi configuré!\n"
-                      f"📊 Événement: {tournament.selectedEvent['name']}\n"
-                      f"🎮 Stations disponibles: {stations_count}")
-        
-    except Exception as e:
-        await interaction.followup.send(f"❌ Erreur lors de la configuration: {e}")
+    
 
 @bot.tree.command(name="start_matches", description="Démarre la gestion automatique des matchs")
 async def start_matches(interaction: discord.Interaction):
@@ -147,47 +145,19 @@ async def stop_matches(interaction: discord.Interaction):
     else:
         if deleted_channels > 0:
             await interaction.followup.send(f"🧹 {deleted_channels} channels supprimés.")
+    # Nettoyer les listes
     match_manager.reset_all_match()
+    current_tournament.station.clear()  # Vider la liste des stations
+    match_manager.active_matches.clear()  # Vider les matchs actifs du gestionnaire
+    match_manager.pending_matches.clear()  # Vider les matchs en attente
 
-    # 3. Supprimer toutes les stations
-    if current_tournament:
-        try:
-            stations_in_use = []
-            stations_removed = 0
             
-            # Supprimer toutes les stations
-            for i in range(len(current_tournament.station) - 1, -1, -1):
-                station = current_tournament.station[i]
-                # Forcer la suppression même si en cours d'utilisation
-                try:
-                    station['isUsed'] = False
-                    current_tournament.delete_station(i + 1)  # i + 1 car les stations sont numérotées à partir de 1
-                    stations_removed += 1
-                except Exception as e:
-                    print(f"Erreur lors de la suppression de la station {i + 1}: {e}")
-            
-            if stations_removed > 0:
-                await interaction.followup.send(f"🗑️ {stations_removed} stations ont été supprimées.")
-            
-            # Nettoyer les listes
-            match_manager.reset_all_match()
-            current_tournament.station.clear()  # Vider la liste des stations
-            match_manager.active_matches.clear()  # Vider les matchs actifs du gestionnaire
-            match_manager.pending_matches.clear()  # Vider les matchs en attente
-            
-            await interaction.followup.send("✅ **Arrêt complet terminé :**\n"
-                          f"• Gestionnaire de matchs arrêté\n"
-                          f"• {deleted_channels} channels supprimés\n"
-                          f"• {stations_removed} stations supprimées\n"
-                          f"• Toutes les listes nettoyées")
-            
-        except Exception as e:
-            await interaction.followup.send(f"❌ Erreur lors de la suppression des stations: {e}")
-    else:
-        await interaction.followup.send("✅ **Arrêt terminé :**\n"
-                      f"• Gestionnaire de matchs arrêté\n"
-                      f"• {deleted_channels} channels supprimés\n"
-                      f"• Aucune station à supprimer")
+    await interaction.followup.send("✅ **Arrêt complet terminé :**\n"
+                    f"• Gestionnaire de matchs arrêté\n"
+                    f"• {deleted_channels} channels supprimés\n"
+                    f"• Toutes les listes nettoyées")
+    
+
 
 
 @bot.tree.command(name="match_status", description="Affiche le statut du gestionnaire de matchs")
@@ -387,7 +357,7 @@ async def clean_all_channels(interaction: discord.Interaction):
     else:
         await interaction.followup.send(f"✅ {deleted_channels} channels supprimés.")
 
-@bot.tree.command(name="remove_all_stations", description="Supprime toutes les stations du tournoi")
+@bot.tree.command(name="remove_all_stations", description="Supprime toutes les stations du tournoi") #Bit
 async def remove_all_stations(interaction: discord.Interaction):
     """Supprime toutes les stations du tournoi"""
     global current_tournament, match_manager
@@ -403,19 +373,10 @@ async def remove_all_stations(interaction: discord.Interaction):
         stations_removed = 0
         
         # Supprimer toutes les stations
-        for i in range(len(current_tournament.station) - 1, -1, -1):
-            station = current_tournament.station[i]
-            if station['isUsed']:
-                stations_in_use.append(station['number'])
-                continue
-            
+        for s in current_tournament.station:
             # Supprimer la station via l'API StartGG
-            current_tournament.delete_station(i + 1)  # i + 1 car les stations sont numérotées à partir de 1
+            current_tournament.delete_station(s['number'])
             stations_removed += 1
-        
-        # Messages de résultat
-        if stations_in_use:
-            await interaction.followup.send(f"⚠️ Stations {', '.join(map(str, stations_in_use))} en cours d'utilisation et ne peuvent pas être supprimées.")
         
         if stations_removed > 0:
             await interaction.followup.send(f"✅ {stations_removed} stations ont été supprimées.")
@@ -429,6 +390,7 @@ async def remove_all_stations(interaction: discord.Interaction):
         
     except Exception as e:
         await interaction.followup.send(f"❌ Erreur lors de la suppression des stations: {e}")
+        
 @bot.tree.command(name="force_refresh", description="Force l'actualisation de la liste des matchs")
 async def force_refresh(interaction: discord.Interaction):
     """Force l'actualisation de la liste des matchs"""
@@ -441,5 +403,11 @@ async def force_refresh(interaction: discord.Interaction):
     await interaction.response.defer()
     new_matches = await match_manager.refresh_matches_list(interaction)
     await interaction.followup.send(f"🔄 Actualisation forcée terminée! {new_matches} nouveaux matchs ajoutés.")
+    
+# Remplacez votre ancienne commande setup_tournament par celle-ci :
+@bot.tree.command(name="setup_tournament_test", description="Configurer un tournoi pour le test via une interface modale")
+async def setup_tournament_test(interaction: discord.Interaction):
+    """Configurer un tournoi via une interface modale"""
+    
 
 bot.run(token)
