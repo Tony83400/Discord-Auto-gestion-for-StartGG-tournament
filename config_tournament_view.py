@@ -45,7 +45,14 @@ class TournamentModal(discord.ui.Modal):
         
         # Créer l'objet tournament
         tournament = Tournament(tournament_slug)
-        
+        print(link_parts)
+        if len(link_parts) >= 7:
+            tournament.select_event_by_name(link_parts[6].strip())
+        if len(link_parts) >= 9:
+            tournament.select_event_phase(link_parts[8].strip())
+        if len(link_parts) >= 10:
+            tournament.select_pool(link_parts[9].strip())
+        print(link_parts)
         # Vérifications
         if tournament.id is None:
             await interaction.followup.send(
@@ -191,16 +198,15 @@ class PhaseSelector(discord.ui.Select):
             options = [discord.SelectOption(label="Aucune phase disponible", value="none")]
             disabled = True
         else:
-            print(tournament.selectedEvent)
+            # print(tournament.selectedEvent)
             # print(f"Phases disponibles pour l'événement {tournament.selectedEvent['name']}: {len(tournament.selectedEvent['phases'])}")
             options = []
             for i, phase in enumerate(tournament.selectedEvent['phases']):
                 is_default = bool(
-    hasattr(tournament, 'selectedPhase') and 
-    tournament.selectedPhase and 
-    str(phase['id']) == str(tournament.selectedPhase['id'])
-)
-                
+                    hasattr(tournament, 'selectedPhase') and 
+                    tournament.selectedPhase and 
+                    str(phase['id']) == str(tournament.selectedPhase['id'])
+                )
                 options.append(discord.SelectOption(
                     label=phase['name'], 
                     value=str(phase['id']),
@@ -216,68 +222,42 @@ class PhaseSelector(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         selected_phase_id = self.values[0]
-        self.tournament.select_event_phase(selected_phase_id)
-        print(f"Phase sélectionnée : {self.tournament.selectedPhaseId}")
-        if selected_phase_id != "none":
-            # Trouver et stocker la phase sélectionnée
-            selected_phase = next((phase for phase in self.tournament.selectedEvent['phases'] if str(phase['id']) == selected_phase_id), None)
-            if selected_phase:
-                self.tournament.selectedPhase = selected_phase
-                
-                # Récupérer les pools de cette phase
-                if 'pools' in selected_phase:
-                    self.tournament.selectedPools = selected_phase['pools']
-                elif hasattr(self.tournament.selectedEvent, 'pools'):
-                    self.tournament.selectedPools = [
-                        pool for pool in self.tournament.selectedEvent.get('pools', []) 
-                        if pool.get('phaseId') == selected_phase['id']
-                    ]
-                else:
-                    self.tournament.selectedPools = []
-                
-                # Réinitialiser la pool sélectionnée
-                self.tournament.selectedPool = None
+        self.tournament.select_event_phase(selected_phase_id)        
             
-            # Recréer la vue pour mettre à jour les pools
-            new_view = TournamentView(self.tournament)
-            await interaction.response.edit_message(
-                content=f"✅ Phase sélectionnée : **{selected_phase['name']}**", 
-                view=new_view
-            )
-        else:
-            await interaction.response.send_message("Aucune phase disponible", ephemeral=True)
+        new_view = TournamentView(self.tournament)
+        await interaction.response.edit_message(
+            view=new_view
+        )
+
 
 
 class PoolSelector(discord.ui.Select):
     def __init__(self, tournament: Tournament):
         self.tournament = tournament
-        selectedPhase = None
-        for phase in tournament.selectedEvent['phases']:
-            print("Phase : ", phase['id'] ," == ", tournament.selectedPhaseId)
-            if int(phase['id']) == int(tournament.selectedPhaseId):
-                selectedPhase = phase
-                break
+        selectedPhase = self.tournament.selectedPhase
+       
+        options = []
         if selectedPhase is None:
             print("Aucune poule disponible pour la phase sélectionnée.")
             options = [discord.SelectOption(label="Aucune poule disponible", value="none")]
             disabled = True
-            tournament.selectedPools = []
-        else:
-            options = []
-            print("Selected Phase : ", selectedPhase)
-            for pool in selectedPhase.get('phaseGroups', []):
-                is_default = bool(
-                    hasattr(tournament, 'selectedPoolId') and 
-                    tournament.selectedPoolId and 
-                    str(pool['id']) == str(tournament.selectedPoolId)
-                )
-                options.append(discord.SelectOption(
-                    label=pool['displayIdentifier'], 
-                    value=str(pool['id']),
-                    default=is_default
-                ))
-            disabled = False
-        
+            super().__init__(placeholder="Aucune poule disponible", options=options, disabled=disabled)
+            return
+        print(selectedPhase.get('phaseGroups', []))
+        for pool in selectedPhase.get('phaseGroups', [])['nodes']:
+            print("Pool:", pool)
+            is_default = bool(
+                hasattr(tournament, 'selectedPoolId') and 
+                tournament.selectedPoolId and 
+                str(pool['id']) == str(tournament.selectedPoolId)
+            )
+            options.append(discord.SelectOption(
+                label=pool['displayIdentifier'], 
+                value=str(pool['id']),
+                default=is_default
+            ))
+        disabled = False
+    
         super().__init__(
             placeholder="Sélectionnez une poule", 
             options=options, 
@@ -294,7 +274,7 @@ class PoolSelector(discord.ui.Select):
                 self.tournament.selectedPool = selected_pool
             
             await interaction.response.send_message(
-                f"✅ Poule sélectionnée : **{selected_pool['displayIdentifier']}**", 
+                f"✅ Poule sélectionnée ", 
                 ephemeral=True
             )
         else:

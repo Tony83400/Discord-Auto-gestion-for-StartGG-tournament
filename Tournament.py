@@ -20,6 +20,7 @@ class Tournament:
         self.selectedPoolId = None
         self.playerList = []
         self.DiscordIdForPlayer = {}
+        self.selectedPhase = None
         self.id = None
         self.numAttendees = 0
         self.characterList = self.sgg_request.get_all_characters() #Peut etre changer pour d'autre jeux
@@ -60,6 +61,14 @@ class Tournament:
             raise ValueError("No event selected. Please select an event first.")
     def select_event(self, event_id :int):
         self.selectedEvent = self.sgg_request.get_event_phases(event_id)
+    def select_event_by_name(self, event_name: str):
+        event_name = event_name.replace('-', ' ')
+        if self.events:
+            for event in self.events:
+                if event['name'].lower() == event_name.lower():
+                    self.selectedEvent = self.sgg_request.get_event_phases(event['id'])
+                    return
+
     def set_best_of(self, bestOf_N: int):
         if bestOf_N > 0:
             self.bestOf_N = bestOf_N
@@ -77,6 +86,13 @@ class Tournament:
     def select_event_phase(self, phase_id: int):
         if self.selectedEvent:
             self.selectedPhaseId = phase_id
+            for phase in self.selectedEvent['phases']:
+                print("phase",phase['id'])
+                print("phase id", phase_id)
+                if int(phase['id']) == int(phase_id):
+                    print("Phase found")
+                    self.selectedPhase = phase
+                    self.selectedPoolId = None
         else:
             raise ValueError("No event selected. Please select an event first.")
     def select_pool(self, pool_id: int):
@@ -115,9 +131,7 @@ class Tournament:
                     final_matches.append(match)
                     
             final_matches = self.order_match(final_matches)
-            # for match in final_matches:
-            #     print(f"Match ID: {match['id']}, Round: {match['round']}, Entrants: {[e['entrant']['name'] for e in match['slots'] if e['entrant'] is not None]}")
-
+            
             return final_matches
         else:
             raise ValueError("No matches found for the selected phase.")
