@@ -25,6 +25,8 @@ class Tournament:
         self.numAttendees = 0
         self.characterList = self.sgg_request.get_all_characters() #Peut etre changer pour d'autre jeux
         self.bestOf_N = 3  # Nombre de jeux par match, peut être modifié selon le tournoi
+        self.round_where_bo5_start_winner = None 
+        self.round_where_bo5_start_loser = None
         result = self.sgg_request.get_tournament(slug)
         if result:
             self.name = result.get('name')
@@ -69,9 +71,11 @@ class Tournament:
                     self.selectedEvent = self.sgg_request.get_event_phases(event['id'])
                     return
 
-    def set_best_of(self, bestOf_N: int):
+    def set_best_of(self, bestOf_N: int, round_where_bo5_start_winner: int = None , round_where_bo5_start_loser: int = None):
         if bestOf_N > 0:
             self.bestOf_N = bestOf_N
+            self.round_where_bo5_start_winner = round_where_bo5_start_winner
+            self.round_where_bo5_start_loser = round_where_bo5_start_loser
         else:
             raise ValueError("Best of N must be a positive integer.")
     def get_event_phases(self):
@@ -143,7 +147,7 @@ class Tournament:
             raise ValueError("No phase selected. Please select an phase first.")
         if self.selectedPoolId == None:
             raise ValueError("No pool selected. Please select an pool first.")
-        myMatch = sggMatch_to_MyMatch(match, self.bestOf_N)
+        myMatch = sggMatch_to_MyMatch(match, self)
         for s in self.station:
             if s['number'] == station_number:
                 if s['isUsed'] == False:
@@ -204,7 +208,18 @@ class Tournament:
         else:
             print("No stations available.")
             return None
-def sggMatch_to_MyMatch(match, bestOf_N = 3):
+def sggMatch_to_MyMatch(match, tournament : Tournament):
+    print(match)
+    if tournament.round_where_bo5_start_winner is not None and tournament.round_where_bo5_start_loser is not None:
+        if match['round'] >= tournament.round_where_bo5_start_winner and match['round'] >= 0:
+            bestOf_N = 5
+        elif match['round'] < 0 and match['round'] <= tournament.round_where_bo5_start_loser:
+            bestOf_N = 5
+        else :
+            bestOf_N = 3
+            
+    else:
+        bestOf_N = tournament.bestOf_N
     p1 = match['slots'][0]['entrant']
     p2 = match['slots'][1]['entrant']
     matchId = match['id']

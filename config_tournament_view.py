@@ -1,11 +1,13 @@
 import discord
 from discord.ext import commands
 
+from match_manager import MatchManager
 from tournament import Tournament
 
 class TournamentModal(discord.ui.Modal):
-    def __init__(self):
+    def __init__(self, bot=None):
         super().__init__(title="Configuration du Tournoi")
+        self.bot = bot  # Stocker la référence du bot
         
         self.tournament_link = discord.ui.TextInput(
             label="Lien du tournoi",
@@ -17,7 +19,6 @@ class TournamentModal(discord.ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction):
         """Appelé quand l'utilisateur soumet le modal"""
-        # try:
         await interaction.response.defer(ephemeral=True)
         
         # Récupérer et nettoyer le lien
@@ -71,8 +72,8 @@ class TournamentModal(discord.ui.Modal):
         # Initialiser les valeurs par défaut
         self._initialize_tournament_defaults(tournament)
         
-        # Créer la vue avec le tournoi
-        view = TournamentView(tournament)
+        # Créer la vue avec le tournoi ET le bot
+        view = TournamentView(tournament, self.bot)
         
         # Message de succès avec informations du tournoi
         embed = discord.Embed(
@@ -87,12 +88,6 @@ class TournamentModal(discord.ui.Modal):
             view=view, 
             ephemeral=True
         )
-            
-        # except Exception as e:
-        #     await interaction.followup.send(
-        #         f"❌ Erreur lors de la configuration : {str(e)}", 
-        #         ephemeral=True
-        #     )
 
     def _is_valid_startgg_link(self, link_parts):
         """Valide le format du lien start.gg"""
@@ -181,7 +176,7 @@ class EventSelector(discord.ui.Select):
             self.tournament.selectedPool = None
         
         # Créer une nouvelle vue avec les données mises à jour
-        new_view = TournamentView(self.tournament)
+        new_view = TournamentView(self.tournament, self.view.bot)  # Passer le bot
         
         await interaction.response.edit_message(
             content=f"✅ Événement sélectionné : **{selected_event['name']}**", 
@@ -198,8 +193,6 @@ class PhaseSelector(discord.ui.Select):
             options = [discord.SelectOption(label="Aucune phase disponible", value="none")]
             disabled = True
         else:
-            # print(tournament.selectedEvent)
-            # print(f"Phases disponibles pour l'événement {tournament.selectedEvent['name']}: {len(tournament.selectedEvent['phases'])}")
             options = []
             for i, phase in enumerate(tournament.selectedEvent['phases']):
                 is_default = bool(
@@ -224,11 +217,10 @@ class PhaseSelector(discord.ui.Select):
         selected_phase_id = self.values[0]
         self.tournament.select_event_phase(selected_phase_id)        
             
-        new_view = TournamentView(self.tournament)
+        new_view = TournamentView(self.tournament, self.view.bot)  # Passer le bot
         await interaction.response.edit_message(
             view=new_view
         )
-
 
 
 class PoolSelector(discord.ui.Select):
@@ -282,9 +274,10 @@ class PoolSelector(discord.ui.Select):
 
 
 class TournamentView(discord.ui.View):
-    def __init__(self, tournament: Tournament):
+    def __init__(self, tournament: Tournament, bot=None):
         super().__init__(timeout=300)  # 5 minutes de timeout
         self.tournament = tournament
+        self.bot = bot  # Stocker la référence du bot
 
         # Ajouter les sélecteurs
         self.add_item(EventSelector(tournament))
@@ -301,6 +294,8 @@ class TournamentView(discord.ui.View):
         self.add_item(validate_button)
 
     async def validate_configuration(self, interaction: discord.Interaction):
+        print("Validation de la configuration du tournoi")
+        
         """Valide la configuration finale du tournoi"""
         config_summary = []
         
@@ -319,7 +314,24 @@ class TournamentView(discord.ui.View):
                 ephemeral=True
             )
             return
-
+        
+        tournament = self.tournament
+        tournament.set_best_of(3)
+        tournament._set_player_list()  # Mettre à jour la liste des joueurs
+        for i in range(2):
+            tournament.create_station(i + 1)  # Créer les stations
+            print(f"Station {i + 1} créée avec succès")
+        
+        # Créer le gestionnaire de matchs et l'assigner aux variables globales du bot
+        match_manager = MatchManager(self.bot, tournament)
+        match_manager.player_list = tournament.DiscordIdForPlayer  # Mettre à jour la liste des joueurs dans le gestionnaire
+        
+        # Assigner aux variables globales du bot
+        if hasattr(self.bot, 'current_tournament'):
+            self.bot.current_tournament = tournament
+        if hasattr(self.bot, 'match_manager'):
+            self.bot.match_manager = match_manager
+        
         embed = discord.Embed(
             title="🎯 Configuration validée !",
             description="\n".join(config_summary),
@@ -330,6 +342,7 @@ class TournamentView(discord.ui.View):
             embed=embed,
             ephemeral=True
         )
+        print("Configuration du tournoi validée avec succès")
 
     async def on_timeout(self):
         """Appelé quand la vue expire"""

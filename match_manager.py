@@ -143,7 +143,7 @@ class MatchManager:
         """Assigne un match spécifique à une station"""
         try:
             # Créer l'objet Match
-            my_match = sggMatch_to_MyMatch(sgg_match, self.tournament.bestOf_N)  # BO3 par défaut
+            my_match = sggMatch_to_MyMatch(sgg_match, self.tournament)  # BO3 par défaut
             
             # Configurer les personnages (tu peux adapter selon tes besoins)
             character_names = [char['name'] for char in self.tournament.characterList]
