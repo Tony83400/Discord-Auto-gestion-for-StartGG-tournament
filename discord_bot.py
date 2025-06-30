@@ -106,7 +106,11 @@ async def stop_matches(interaction: discord.Interaction):
     else:
         if deleted_channels > 0:
             await interaction.followup.send(f"🧹 {deleted_channels} channels supprimés.")
-    
+    #Remove all stations from the tournament
+    num_stations = 0
+    for station in bot.current_tournament.station:
+        bot.current_tournament.delete_station(station['number'])
+        num_stations += 1
     # Nettoyer les listes
     bot.match_manager.reset_all_match()
     bot.current_tournament.station.clear()  # Vider la liste des stations
@@ -116,6 +120,7 @@ async def stop_matches(interaction: discord.Interaction):
     await interaction.followup.send("✅ **Arrêt complet terminé :**\n"
                     f"• Gestionnaire de matchs arrêté\n"
                     f"• {deleted_channels} channels supprimés\n"
+                    f"• {num_stations} stations supprimées\n"
                     f"• Toutes les listes nettoyées")
 
 @bot.tree.command(name="match_status", description="Affiche le statut du gestionnaire de matchs")

@@ -69,6 +69,7 @@ class StartGG:
       event(id: $eventId) {
                             id
                             name
+                            numEntrants
                             phases {
                                 id
                                 name
