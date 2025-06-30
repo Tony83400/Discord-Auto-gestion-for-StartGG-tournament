@@ -46,14 +46,12 @@ class TournamentModal(discord.ui.Modal):
         
         # Créer l'objet tournament
         tournament = Tournament(tournament_slug)
-        print(link_parts)
         if len(link_parts) >= 7:
             tournament.select_event_by_name(link_parts[6].strip())
         if len(link_parts) >= 9:
             tournament.select_event_phase(link_parts[8].strip())
         if len(link_parts) >= 10:
             tournament.select_pool(link_parts[9].strip())
-        print(link_parts)
         # Vérifications
         if tournament.id is None:
             await interaction.followup.send(
@@ -235,9 +233,7 @@ class PoolSelector(discord.ui.Select):
             disabled = True
             super().__init__(placeholder="Aucune poule disponible", options=options, disabled=disabled)
             return
-        print(selectedPhase.get('phaseGroups', []))
         for pool in selectedPhase.get('phaseGroups', [])['nodes']:
-            print("Pool:", pool)
             is_default = bool(
                 hasattr(tournament, 'selectedPoolId') and 
                 tournament.selectedPoolId and 
@@ -340,50 +336,164 @@ class TournamentView(discord.ui.View):
         print("Configuration du tournoi validée, passage à la configuration des matchs")
 
 
+import discord
+from typing import Optional
+
 class BoSelector(discord.ui.Select):
-    def __init__(self):
+    def __init__(self, tournament: 'Tournament'):
+        # Détermine la valeur sélectionnée par défaut
+        
         options = [
             discord.SelectOption(
-                label="Best of 3",
+                label="Best of 3 (tous les matchs)",
                 value="3",
-                description="Premier à 2 victoires",
+                description="Tous les matchs en BO3",
+                emoji="3️⃣",
                 default=True
             ),
             discord.SelectOption(
-                label="Best of 5",
+                label="Best of 5 (tous les matchs)",
                 value="5",
-                description="Premier à 3 victoires"
+                description="Tous les matchs en BO5",
+                emoji="5️⃣",
+                default=False
             ),
             discord.SelectOption(
-                label="Format personnalisé",
+                label="Format personnalisé (par round)",
                 value="custom",
-                description="Configuration avancée (à implémenter)"
+                description="BO3 avant certains rounds, BO5 après",
+                emoji="⚙️",
+                default=False
             )
         ]
         
         super().__init__(
             placeholder="Sélectionnez le format de match",
             options=options,
-            custom_id="bo_selector"
+            custom_id="bo_selector",
+            min_values=1,
+            max_values=1
         )
+        self.tournament = tournament
 
     async def callback(self, interaction: discord.Interaction):
-        self.view.selected_bo = self.values[0]
+        selected_value = self.values[0]
+        self.view.selected_bo = selected_value
         
         # Mettre à jour les options pour refléter la sélection
         for option in self.options:
-            option.default = (option.value == self.values[0])
+            option.default = (option.value == selected_value)
         
-        if self.values[0] == "custom":
-            await interaction.response.send_message(
-                "⚙️ Format personnalisé sélectionné. Cette fonctionnalité sera implémentée prochainement.",
+        if selected_value == "custom":
+            # Mode custom - afficher les sélecteurs pour winner/loser
+            self.view.show_custom_selectors()
+            
+            await interaction.response.edit_message(view=self.view)
+            await interaction.followup.send(
+                "⚙️ Configurez les rounds à partir desquels le format passe en BO5:",
                 ephemeral=True
             )
         else:
-            await interaction.response.send_message(
-                f"✅ Format sélectionné: **Bo{self.values[0]}**",
+            # Mode simple BO3 ou BO5 pour tous les matchs
+            self.view.hide_custom_selectors()
+            
+            # Sauvegarde du format dans le tournoi
+            self.tournament.default_bo = int(selected_value)
+            self.tournament.bo_custom = False
+            self.tournament.round_where_bo5_start_winner = None
+            self.tournament.round_where_bo5_start_loser = None
+            
+            await interaction.response.edit_message(view=self.view)
+            await interaction.followup.send(
+                f"✅ Format sélectionné: **Best of {selected_value}** pour tous les matchs",
                 ephemeral=True
             )
+
+
+class RoundBoSelector(discord.ui.Select):
+    def __init__(self, tournament: 'Tournament', bracket_type: str):
+        self.tournament = tournament
+        self.bracket_type = bracket_type  # "winner" ou "loser"
+        
+        matches = tournament.get_round_of_match()
+        options = []
+        
+        # Récupère la valeur actuellement configurée
+        current_round = (tournament.round_where_bo5_start_winner if bracket_type == "winner" 
+                        else tournament.round_where_bo5_start_loser)
+        
+        # Génère les options pour les rounds
+        for match in matches:
+            round_num = match['round']
+            
+            # Filtre selon le type de bracket
+            if (bracket_type == "winner" and round_num > 0) or \
+               (bracket_type == "loser" and round_num < 0):
+                
+                # Pour le bracket winner, on montre les rounds dans l'ordre croissant
+                # Pour le loser, dans l'ordre décroissant (car rounds négatifs)
+                options.append(discord.SelectOption(
+                    label=match['fullRoundText'],
+                    value=str(round_num),
+                    description=f"À partir de ce round: BO5",
+                    default=(round_num == current_round)
+                ))
+        
+        # Option pour ne jamais passer en BO5 dans ce bracket
+        never_option = discord.SelectOption(
+            label=f"Toujours BO3 ({bracket_type} bracket)",
+            value="0",
+            description=f"Ne jamais passer en BO5 dans le {bracket_type} bracket",
+            emoji="❌",
+            default=(current_round is None)
+        )
+        
+        # Insère en première position
+        options.insert(0, never_option)
+        
+        # Trie les options selon le bracket
+        if bracket_type == "winner":
+            options[1:] = sorted(options[1:], key=lambda x: int(x.value))
+        else:
+            options[1:] = sorted(options[1:], key=lambda x: -int(x.value))
+        
+        super().__init__(
+            placeholder=f"Round ({bracket_type}) pour BO5",
+            options=options,
+            custom_id=f"bo_round_{bracket_type}"
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        selected_round = int(self.values[0]) if self.values[0] != "0" else None
+        
+        # Sauvegarde de la configuration
+        if self.bracket_type == "winner":
+            self.tournament.round_where_bo5_start_winner = selected_round
+        else:
+            self.tournament.round_where_bo5_start_loser = selected_round
+        
+        # Active le mode custom
+        self.tournament.bo_custom = True
+        self.tournament.default_bo = 3  # Par défaut BO3 avant les rounds spécifiés
+        
+        # Met à jour les sélections
+        for option in self.options:
+            option.default = ((option.value == "0" and selected_round is None) or 
+                             (option.value != "0" and int(option.value) == selected_round))
+        
+        await interaction.response.edit_message(view=self.view)
+        
+        # Message de confirmation
+        if selected_round is None:
+            message = f"✅ Tous les matchs en {self.bracket_type} bracket resteront en BO3"
+        else:
+            round_name = next((m['fullRoundText'] for m in self.tournament.get_round_of_match() 
+                             if m['round'] == selected_round), f"Round {abs(selected_round)}")
+            message = (f"✅ Les matchs en {self.bracket_type} bracket seront en:\n"
+                      f"- BO3 avant le {round_name}\n"
+                      f"- BO5 à partir du {round_name} (inclus)")
+        
+        await interaction.followup.send(message, ephemeral=True)
 
 
 class SetupCountSelector(discord.ui.Select):
@@ -535,10 +645,20 @@ class MatchConfigurationView(discord.ui.View):
         self.selected_bo = "3"
         self.num_setups = 2
         self.first_setup_number = 1
+        self.custom_selectors_visible = False
         
-        # Ajouter les composants
-        self.add_item(BoSelector())
+        # Ajouter les composants - CHANGEMENT ICI
+        self.bo_selector = BoSelector(self.tournament)
+        self.winner_selector = RoundBoSelector(self.tournament, "winner")
+        self.loser_selector = RoundBoSelector(self.tournament, "loser")
+        
+        # Ajouter seulement le sélecteur principal au départ
+        self.add_item(self.bo_selector)
         self.add_item(SetupCountSelector())
+        
+        # Afficher les sélecteurs custom si c'est déjà configuré
+        if getattr(tournament, 'bo_custom', False):
+            self.show_custom_selectors()
         
         # Bouton pour configurer le numéro de premier setup
         setup_number_button = discord.ui.Button(
@@ -558,6 +678,26 @@ class MatchConfigurationView(discord.ui.View):
         validate_button.callback = self.launch_tournament
         self.add_item(validate_button)
 
+    def show_custom_selectors(self):
+        """Affiche les sélecteurs pour la configuration par round"""
+        if not self.custom_selectors_visible:
+            # Ajouter les sélecteurs après le BO selector
+            self.add_item(self.winner_selector)
+            self.add_item(self.loser_selector)
+            self.custom_selectors_visible = True
+    
+    def hide_custom_selectors(self):
+        """Cache les sélecteurs pour la configuration par round"""
+        if self.custom_selectors_visible:
+            # Supprimer les sélecteurs custom
+            try:
+                self.remove_item(self.winner_selector)
+                self.remove_item(self.loser_selector)
+                self.custom_selectors_visible = False
+            except ValueError:
+                # Les items ne sont pas dans la vue
+                pass
+
     async def configure_setup_number(self, interaction: discord.Interaction):
         """Ouvre un modal pour configurer le numéro du premier setup"""
         modal = SetupNumberModal(self)
@@ -569,6 +709,7 @@ class MatchConfigurationView(discord.ui.View):
             if hasattr(item, 'custom_id') and item.custom_id == "setup_number_config":
                 item.label = f"Premier setup: #{self.first_setup_number}"
                 break
+                
     async def launch_tournament(self, interaction: discord.Interaction):
         """Lance le tournoi avec la configuration choisie"""
         await interaction.response.defer(ephemeral=True)
@@ -631,7 +772,6 @@ class MatchConfigurationView(discord.ui.View):
                 value=f"{self.tournament.name}",
                 inline=False
             )
-            print(self.tournament.selectedEvent)
             
             if hasattr(self.tournament, 'selectedEvent') and self.tournament.selectedEvent:
                 embed.add_field(

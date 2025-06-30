@@ -128,6 +128,28 @@ class StartGG:
             return response["data"]["event"]["phases"]
         print("Aucun match trouvé pour cette phase.")
         return None
+    def get_phase_match_for_round(self,eventId : str ,  phase_id: str, phaseGroupId : str ) -> Optional[Dict[str, Any]]:
+        """Récupère les matchs d'une phase spécifique. permet de filtrer par état."""
+        query = """
+    query PhaseSets($phaseId: ID!,$phaseGroupId: ID!, $eventId: ID!) {
+         event(id: $eventId) {
+        phases(phaseId: $phaseId) {
+            sets(filters: { phaseGroupIds: [$phaseGroupId]}) {
+                nodes {
+                    round
+                    fullRoundText
+                }
+            }
+        }
+    }
+    }
+        """
+        variables = {"phaseId": phase_id , "phaseGroupId": phaseGroupId, "eventId": eventId}
+        response = self._make_request(query, variables)
+        if response and "data" in response:
+            return response["data"]["event"]["phases"][0]['sets']
+        print("Aucun match trouvé pour cette phase.")
+        return None
     #Update le score d'un match
     def update_match_score(self, set_id: str, games: list[Dict], winner_id: str) -> Optional[Dict[str, Any]]:
         """Met à jour le score d'un match avec reportBracketSet

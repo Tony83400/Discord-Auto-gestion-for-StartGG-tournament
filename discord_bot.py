@@ -204,35 +204,6 @@ async def list_stations(interaction: discord.Interaction):
     
     await interaction.response.send_message(embed=embed)
 
-@bot.tree.command(name="manual_assign", description="Assigne manuellement le prochain match à une station spécifique")
-@app_commands.describe(station_number="Numéro de la station où assigner le match")
-async def manual_assign(interaction: discord.Interaction, station_number: int):
-    """Assigne manuellement le prochain match à une station spécifique"""
-    
-    if not bot.match_manager:
-        await interaction.response.send_message("❌ Aucun gestionnaire configuré.")
-        return
-    
-    if not bot.match_manager.pending_matches:
-        await interaction.response.send_message("❌ Aucun match en attente.")
-        return
-    
-    # Vérifier que la station est libre
-    station_free = False
-    for station in bot.match_manager.tournament.station:
-        if station['number'] == station_number and not station['isUsed']:
-            station_free = True
-            break
-    
-    if not station_free:
-        await interaction.response.send_message(f"❌ La station {station_number} n'est pas disponible.")
-        return
-    
-    await interaction.response.defer()
-    
-    # Assigner le match
-    next_match = bot.match_manager.pending_matches.pop(0)
-    await bot.match_manager.assign_match_to_station(interaction, next_match, station_number)
 
 @bot.tree.command(name="help_tournament", description="Affiche le menu d'aide complet du bot")
 async def help_tournament(interaction: discord.Interaction):
@@ -315,7 +286,7 @@ async def clean_all_channels(interaction: discord.Interaction):
     else:
         await interaction.followup.send(f"✅ {deleted_channels} channels supprimés.")
 
-@bot.tree.command(name="remove_all_stations", description="Supprime toutes les stations du tournoi") #Bit
+@bot.tree.command(name="remove_all_stations", description="Supprime toutes les stations du tournoi")
 async def remove_all_stations(interaction: discord.Interaction):
     """Supprime toutes les stations du tournoi"""
     
@@ -358,12 +329,7 @@ async def force_refresh(interaction: discord.Interaction):
     
     await interaction.response.defer()
     new_matches = await bot.match_manager.refresh_matches_list(interaction)
-    await interaction.followup.send(f"🔄 Actualisation forcée terminée! {new_matches} nouveaux matchs ajoutés.")
-    
-# Remplacez votre ancienne commande setup_tournament par celle-ci :
-@bot.tree.command(name="setup_tournament_test", description="Configurer un tournoi pour le test via une interface modale")
-async def setup_tournament_test(interaction: discord.Interaction):
-    """Configurer un tournoi via une interface modale"""
-    
+
+    await interaction.followup.send(f"🔄 Actualisation forcée terminée! {new_matches} nouveaux matchs ajoutés. Retappez un /start_matches pour que ces matches soit lancer")
 
 bot.run(token)

@@ -21,12 +21,14 @@ class Tournament:
         self.playerList = []
         self.DiscordIdForPlayer = {}
         self.selectedPhase = None
+        self.rounds = None
         self.id = None
         self.numAttendees = 0
         self.characterList = self.sgg_request.get_all_characters() #Peut etre changer pour d'autre jeux
         self.bestOf_N = 3  # Nombre de jeux par match, peut être modifié selon le tournoi
         self.round_where_bo5_start_winner = None 
         self.round_where_bo5_start_loser = None
+        self.bo_custom = False  # Indique si la configuration par round est personnalisée
         result = self.sgg_request.get_tournament(slug)
         if result:
             self.name = result.get('name')
@@ -87,6 +89,7 @@ class Tournament:
                 raise ValueError("No phases found for the selected event.")
         else:
             raise ValueError("No event selected. Please select an event first.")
+    
     def select_event_phase(self, phase_id: int):
         if self.selectedEvent:
             self.selectedPhaseId = phase_id
@@ -137,6 +140,31 @@ class Tournament:
             final_matches = self.order_match(final_matches)
             
             return final_matches
+        else:
+            raise ValueError("No matches found for the selected phase.")
+    def get_round_of_match(self):
+        if self.selectedEvent == None:
+            raise ValueError("No event selected. Please select an event first.")
+        if self.selectedPhaseId == None:
+            raise ValueError("No phase selected. Please select an phase first.")
+        if self.selectedPoolId == None:
+            raise ValueError("No pool selected. Please select an pool first.")
+        if self.rounds is not None:
+            return self.rounds
+        matches = self.sgg_request.get_phase_match_for_round(self.selectedEvent['id'], self.selectedPhaseId, self.selectedPoolId)
+        if matches:
+            roundList = []
+            unique_rounds = []
+            print("Matches found:", matches)
+            for r in matches['nodes']:
+                if r['round'] not in roundList:
+                    roundList.append(r['round'])
+                    unique_rounds.append(r)
+            self.rounds = unique_rounds
+            print("Unique rounds:", unique_rounds)
+            return unique_rounds       
+            
+            
         else:
             raise ValueError("No matches found for the selected phase.")
     
@@ -209,7 +237,6 @@ class Tournament:
             print("No stations available.")
             return None
 def sggMatch_to_MyMatch(match, tournament : Tournament):
-    print(match)
     if tournament.round_where_bo5_start_winner is not None and tournament.round_where_bo5_start_loser is not None:
         if match['round'] >= tournament.round_where_bo5_start_winner and match['round'] >= 0:
             bestOf_N = 5
