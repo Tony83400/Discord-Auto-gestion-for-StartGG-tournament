@@ -237,8 +237,16 @@ class MatchManager:
                 
             p1_name = my_match.p1['name']
             p2_name = my_match.p2['name']
-            
-            await channel.send(f"🎯 **Match démarré** - {p1_name} vs {p2_name} (BO{my_match.bestOf_N})")
+            if p1_name not in self.tournament.DiscordIdForPlayer :
+                p1_id = p1_name
+            else:
+                p1_id = self.tournament.DiscordIdForPlayer[p1_name]
+                
+            if p2_name not in self.tournament.DiscordIdForPlayer :
+                p2_id = p2_name
+            else:
+                p2_id = self.tournament.DiscordIdForPlayer[p2_name]
+            await channel.send(f"🎯 **Match démarré** - <@{p1_id}> vs <@{p2_id}> (BO{my_match.bestOf_N})")
             
             # Importer ici pour éviter les imports circulaires
             from match_report import send_match_report
