@@ -1,7 +1,5 @@
 import discord
-from discord.ext import commands
 
-from match_manager import MatchManager
 from tournament import Tournament
 
 class TournamentModal(discord.ui.Modal):
@@ -337,7 +335,6 @@ class TournamentView(discord.ui.View):
 
 
 import discord
-from typing import Optional
 
 class BoSelector(discord.ui.Select):
     def __init__(self, tournament: 'Tournament'):

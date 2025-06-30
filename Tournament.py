@@ -1,4 +1,3 @@
-from time import sleep
 from startgg_request import StartGG
 from match import Match
 from dotenv import load_dotenv

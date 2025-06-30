@@ -1,20 +1,10 @@
-from time import sleep
 from dotenv import load_dotenv
 import os
-
-from dotenv import load_dotenv
-from startgg_request import StartGG
-from match_manager import MatchManager
-
-import asyncio
-import traceback
 import discord
+from functools import wraps
 from discord.ext import commands
 from discord import app_commands
-from startgg_request import StartGG
-from match import Match
-from tournament import Tournament
-from config_tournament_view import TournamentModal, TournamentView
+from config_tournament_view import TournamentModal
 
 load_dotenv()  # Charge le fichier .env
 
@@ -29,19 +19,43 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 bot.match_manager = None
 bot.current_tournament = None
 
+def has_role(role_name: str):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(interaction: discord.Interaction, *args, **kwargs):
+            if not interaction.guild:
+                await interaction.response.send_message(
+                    "❌ Cette commande ne peut être utilisée que sur un serveur Discord (pas en DM).",
+                    ephemeral=True
+                )
+                return
+
+            member = interaction.user
+            if not isinstance(member, discord.Member):
+                member = await interaction.guild.fetch_member(interaction.user.id)
+
+            role_names = [role.name for role in member.roles]
+            if role_name not in role_names:
+                await interaction.response.send_message(
+                    f"❌ Tu dois avoir le rôle `{role_name}` pour utiliser cette commande.",
+                    ephemeral=True
+                )
+                return
+
+            return await func(interaction, *args, **kwargs)
+        return wrapper
+    return decorator
+
 @bot.event
 async def on_ready():
     print(f"Bot connecté en tant que {bot.user.name} ({bot.user.id})")
-    # Synchroniser les commandes slash
     try:
         synced = await bot.tree.sync()
         print(f"Synchronisé {len(synced)} commande(s) slash")
     except Exception as e:
         print(f"Erreur lors de la synchronisation des commandes: {e}")
     
-    # Trouve le serveur principal (si le bot est sur un seul serveur)
     guild = bot.guilds[0] if bot.guilds else None
-    
     if guild:
         try:
             print(f"Bot prêt sur le serveur: {guild.name} ({guild.id})")
@@ -50,18 +64,16 @@ async def on_ready():
         except discord.HTTPException:
             print("Erreur lors de la création des salons")
 
-
 @bot.tree.command(name="setup_tournament", description="Configure un tournoi pour la gestion automatique")
+@has_role("Tournament Admin")
 async def setup_tournament(interaction: discord.Interaction):
-    """Configure un tournoi pour la gestion automatique"""
-    modal = TournamentModal(bot)  # Passer le bot au modal
+    modal = TournamentModal(bot)
     await interaction.response.send_modal(modal)
 
 @bot.tree.command(name="start_matches", description="Démarre la gestion automatique des matchs")
+@has_role("Tournament Admin")
 async def start_matches(interaction: discord.Interaction):
-    """Démarre la gestion automatique des matchs"""
-    
-    if not bot.match_manager:  # Utiliser bot.match_manager au lieu de match_manager
+    if not bot.match_manager:
         await interaction.response.send_message("❌ Aucun tournoi configuré. Utilisez `/setup_tournament` d'abord.")
         return
     
@@ -69,19 +81,15 @@ async def start_matches(interaction: discord.Interaction):
     await bot.match_manager.start_match_processing(interaction)
 
 @bot.tree.command(name="stop_matches", description="Arrête la gestion automatique des matchs et nettoie tout")
+@has_role("Tournament Admin")
 async def stop_matches(interaction: discord.Interaction):
-    """Arrête la gestion automatique des matchs et nettoie tout"""
-    
-    if not bot.match_manager:  # Utiliser bot.match_manager
+    if not bot.match_manager:
         await interaction.response.send_message("❌ Aucun gestionnaire actif.")
         return
     
     await interaction.response.defer()
-    
-    # 1. Arrêter le gestionnaire de matchs
     await bot.match_manager.stop_match_processing(interaction)
     
-    # 2. Nettoyer tous les channels
     deleted_channels = 0
     for channel in interaction.guild.channels:
         if channel.name.startswith("station-"):
@@ -93,29 +101,26 @@ async def stop_matches(interaction: discord.Interaction):
             except discord.HTTPException as e:
                 print(f"Erreur lors de la suppression du channel {channel.name}: {e}")
     
-    # Supprimer la catégorie ⚔ Matchs en cours
     category = discord.utils.get(interaction.guild.categories, name="⚔ Matchs en cours")
     if category:
         try:
             await category.delete()
-            await interaction.followup.send(f"🧹 {deleted_channels} channels supprimés et catégorie nettoyée.")
         except discord.Forbidden:
-            await interaction.followup.send(f"🧹 {deleted_channels} channels supprimés. Permission refusée pour supprimer la catégorie.")
-        except discord.HTTPException as e:
-            await interaction.followup.send(f"🧹 {deleted_channels} channels supprimés. Erreur lors de la suppression de la catégorie: {e}")
-    else:
-        if deleted_channels > 0:
-            await interaction.followup.send(f"🧹 {deleted_channels} channels supprimés.")
-    #Remove all stations from the tournament
+            pass
+        except discord.HTTPException:
+            pass
+    
     num_stations = 0
-    for station in bot.current_tournament.station:
-        bot.current_tournament.delete_station(station['number'])
-        num_stations += 1
-    # Nettoyer les listes
+    if bot.current_tournament:
+        for station in bot.current_tournament.station:
+            bot.current_tournament.delete_station(station['number'])
+            num_stations += 1
+    
     bot.match_manager.reset_all_match()
-    bot.current_tournament.station.clear()  # Vider la liste des stations
-    bot.match_manager.active_matches.clear()  # Vider les matchs actifs du gestionnaire
-    bot.match_manager.pending_matches.clear()  # Vider les matchs en attente
+    if bot.current_tournament:
+        bot.current_tournament.station.clear()
+    bot.match_manager.active_matches.clear()
+    bot.match_manager.pending_matches.clear()
 
     await interaction.followup.send("✅ **Arrêt complet terminé :**\n"
                     f"• Gestionnaire de matchs arrêté\n"
@@ -125,8 +130,6 @@ async def stop_matches(interaction: discord.Interaction):
 
 @bot.tree.command(name="match_status", description="Affiche le statut du gestionnaire de matchs")
 async def match_status(interaction: discord.Interaction):
-    """Affiche le statut du gestionnaire de matchs"""
-    
     if not bot.match_manager:
         await interaction.response.send_message("❌ Aucun gestionnaire configuré.")
         return
@@ -134,23 +137,12 @@ async def match_status(interaction: discord.Interaction):
     await interaction.response.defer()
     await bot.match_manager.get_status(interaction)
 
-@bot.tree.command(name="refresh_matches", description="Recharge la liste des matchs en attente")
-async def refresh_matches(interaction: discord.Interaction):
-    """Recharge la liste des matchs en attente"""
-    
-    if not bot.match_manager:
-        await interaction.response.send_message("❌ Aucun gestionnaire configuré.")
-        return
-    
-    await interaction.response.defer()
-    if await bot.match_manager.initialize_matches(interaction):
-        await interaction.followup.send("🔄 Liste des matchs rechargée!")
+
 
 @bot.tree.command(name="force_station_free", description="Force la libération d'une station (en cas de problème)")
+@has_role("Tournament Admin")
 @app_commands.describe(station_number="Numéro de la station à libérer")
 async def force_station_free(interaction: discord.Interaction, station_number: int):
-    """Force la libération d'une station (en cas de problème)"""
-    
     if not bot.current_tournament:
         await interaction.response.send_message("❌ Aucun tournoi configuré.")
         return
@@ -158,7 +150,6 @@ async def force_station_free(interaction: discord.Interaction, station_number: i
     await interaction.response.defer()
     
     try:
-        # Libérer la station dans le tournament
         for station in bot.current_tournament.station:
             if station['number'] == station_number:
                 station['isUsed'] = False
@@ -166,9 +157,7 @@ async def force_station_free(interaction: discord.Interaction, station_number: i
                     del station['current_match']
                 break
         
-        # Nettoyer le match manager si nécessaire
         if bot.match_manager and station_number in bot.match_manager.active_matches:
-
             await bot.match_manager.cleanup_completed_match(interaction, station_number)
         
         await interaction.followup.send(f"🔧 Station {station_number} forcée à être libre")
@@ -178,8 +167,6 @@ async def force_station_free(interaction: discord.Interaction, station_number: i
 
 @bot.tree.command(name="list_stations", description="Liste toutes les stations et leur statut")
 async def list_stations(interaction: discord.Interaction):
-    """Liste toutes les stations et leur statut"""
-    
     if not bot.current_tournament:
         await interaction.response.send_message("❌ Aucun tournoi configuré.")
         return
@@ -204,132 +191,87 @@ async def list_stations(interaction: discord.Interaction):
     
     await interaction.response.send_message(embed=embed)
 
-
-@bot.tree.command(name="help_tournament", description="Affiche le menu d'aide complet du bot")
-async def help_tournament(interaction: discord.Interaction):
-    """Affiche le menu d'aide complet du bot"""
+@bot.tree.command(name="help", description="Affiche le menu d'aide complet du bot")
+async def help_command(interaction: discord.Interaction):
     embed = discord.Embed(
         title="🆘 Aide du Bot de Tournoi",
-        description="Liste complète des commandes disponibles",
+        description="**Commandes disponibles** :",
         color=0x3498db
     )
 
-    # Section Gestion de Tournoi
+    # Section Configuration
     embed.add_field(
-        name="🎯 **Gestion de Tournoi**",
+        name="⚙️ **CONFIGURATION**",
         value=(
-            "`/setup_tournament` - Configure un nouveau tournoi\n"
-            "`/start_matches` - Démarre la gestion automatique des matchs\n"
-            "`/stop_matches` - Arrête la gestion automatique\n"
-            "`/refresh_matches` - Recharge la liste des matchs\n"
-            "`/match_status` - Affiche l'état actuel"
+            "`/setup_tournament` - Configurer un nouveau tournoi\n"
+            "`/start_matches` - Démarrer la gestion automatique\n"
+            "`/stop_matches` - Tout arrêter et nettoyer\n"
+            "`/force_refresh` - Rechargement complet (en cas de bug)"
         ),
         inline=False
     )
 
-    # Section Gestion des Stations
+    # Section Matchs en cours
     embed.add_field(
-        name="🕹️ **Gestion des Stations**",
+        name="⚔ **MATCHS EN COURS**",
         value=(
-            "`/list_stations` - Affiche le statut de toutes les stations\n"
-            "`/force_station_free` - Libère une station manuellement\n"
-            "`/manual_assign` - Assigne un match à une station spécifique\n"
-            "`/remove_all_stations` - Supprime toutes les stations"
+            "`/match_status` - Statut global du gestionnaire\n"
+            "`/list_stations` - Liste des stations et leur état"
         ),
         inline=False
     )
 
     # Section Maintenance
     embed.add_field(
-        name="🔧 **Maintenance**",
+        name="🔧 **MAINTENANCE**",
         value=(
-            "`/clean_all_channels` - Nettoie tous les salons de match\n"
-            "`/help_tournament` - Affiche ce message d'aide"
+            "`/force_station_free [n°]` - Libérer une station bloquée\n"
         ),
         inline=False
     )
 
-    # Pied de page avec des conseils
+    # Footer avec conseil
     embed.set_footer(
-        text="Astuce: Les commandes slash offrent une meilleure intégration avec Discord"
+        text="💡 Les commandes marquées nécessitent le rôle 'Tournament Admin'"
     )
 
     await interaction.response.send_message(embed=embed)
-
-@bot.tree.command(name="clean_all_channels", description="Nettoie tous les salons de match")
-async def clean_all_channels(interaction: discord.Interaction):
-    """Nettoie tous les messages du salon"""
-    await interaction.response.defer()
-    
-    # Supprime tous les channels stations
-    deleted_channels = 0
-    for channel in interaction.guild.channels:
-        if channel.name.startswith("station-"):
-            try:
-                await channel.delete()
-                deleted_channels += 1
-            except discord.Forbidden:
-                print(f"Permission refusée pour supprimer le channel {channel.name}.")
-            except discord.HTTPException as e:
-                print(f"Erreur lors de la suppression du channel {channel.name}: {e}")
-    
-    # Supprime la catégorie ⚔ Matchs en cours
-    category = discord.utils.get(interaction.guild.categories, name="⚔ Matchs en cours")
-    if category:
-        try:
-            await category.delete()
-            await interaction.followup.send(f"✅ {deleted_channels} channels supprimés et catégorie nettoyée.")
-        except discord.Forbidden:
-            await interaction.followup.send(f"✅ {deleted_channels} channels supprimés. Permission refusée pour supprimer la catégorie.")
-        except discord.HTTPException as e:
-            await interaction.followup.send(f"✅ {deleted_channels} channels supprimés. Erreur lors de la suppression de la catégorie: {e}")
-    else:
-        await interaction.followup.send(f"✅ {deleted_channels} channels supprimés.")
-
-@bot.tree.command(name="remove_all_stations", description="Supprime toutes les stations du tournoi")
-async def remove_all_stations(interaction: discord.Interaction):
-    """Supprime toutes les stations du tournoi"""
-    
-    if not bot.current_tournament:
-        await interaction.response.send_message("❌ Aucun tournoi configuré.")
-        return
-    
-    await interaction.response.defer()
-    
-    try:
-        stations_in_use = []
-        stations_removed = 0
-        
-        # Supprimer toutes les stations
-        for s in bot.current_tournament.station:
-            # Supprimer la station via l'API StartGG
-            bot.current_tournament.delete_station(s['number'])
-            stations_removed += 1
-        
-        if stations_removed > 0:
-            await interaction.followup.send(f"✅ {stations_removed} stations ont été supprimées.")
-        
-        # Nettoyer les listes si toutes les stations ont été supprimées
-        if not stations_in_use:
-            bot.current_tournament.station.clear()  # Vider la liste des stations
-            if bot.match_manager:
-                bot.match_manager.active_matches.clear()  # Vider les matchs actifs du gestionnaire
-                await interaction.followup.send("🔄 Matchs actifs du gestionnaire réinitialisés.")
-        
-    except Exception as e:
-        await interaction.followup.send(f"❌ Erreur lors de la suppression des stations: {e}")
-        
-@bot.tree.command(name="force_refresh", description="Force l'actualisation de la liste des matchs")
+@bot.tree.command(name="force_refresh", description="[ADMIN] Force un rechargement COMPLET des matchs (en cas de problème)")
+@has_role("Tournament Admin")
 async def force_refresh(interaction: discord.Interaction):
-    """Force l'actualisation de la liste des matchs"""
-    
+    """Recharge intégralement la liste des matchs et nettoie les états"""
     if not bot.match_manager:
         await interaction.response.send_message("❌ Aucun gestionnaire configuré.")
         return
     
     await interaction.response.defer()
-    new_matches = await bot.match_manager.refresh_matches_list(interaction)
-
-    await interaction.followup.send(f"🔄 Actualisation forcée terminée! {new_matches} nouveaux matchs ajoutés. Retappez un /start_matches pour que ces matches soit lancer")
-
+    
+    # 1. Nettoyer les états existants
+    bot.match_manager.pending_matches.clear()
+    if hasattr(bot.match_manager, 'active_matches'):
+        bot.match_manager.active_matches.clear()
+    
+    # 2. Rechargement complet depuis l'API
+    try:
+        matches = bot.tournament.get_matches(state=1)  # Matchs non commencés
+        bot.match_manager.pending_matches = matches.copy()
+        
+        # 3. Réinitialiser les stations
+        if bot.current_tournament:
+            for station in bot.current_tournament.station:
+                station['isUsed'] = False
+                if 'current_match' in station:
+                    del station['current_match']
+        
+        await interaction.followup.send(
+            f"♻️ **Rechargement forcé réussi !**\n"
+            f"• {len(matches)} matchs en attente\n"
+            f"• Toutes stations réinitialisées\n"
+            f"• États internes nettoyés"
+        )
+        
+    except Exception as e:
+        error_msg = f"❌ Échec du rechargement : {str(e)}"
+        print(error_msg)
+        await interaction.followup.send(error_msg)
 bot.run(token)

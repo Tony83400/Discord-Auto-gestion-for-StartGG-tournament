@@ -1,5 +1,5 @@
 import asyncio
-from typing import Dict, List, Optional
+from typing import Dict, List
 import discord
 from discord.ext import commands
 from match import Match
