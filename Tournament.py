@@ -93,10 +93,7 @@ class Tournament:
         if self.selectedEvent:
             self.selectedPhaseId = phase_id
             for phase in self.selectedEvent['phases']:
-                print("phase",phase['id'])
-                print("phase id", phase_id)
                 if int(phase['id']) == int(phase_id):
-                    print("Phase found")
                     self.selectedPhase = phase
                     self.selectedPoolId = None
         else:
@@ -154,13 +151,11 @@ class Tournament:
         if matches:
             roundList = []
             unique_rounds = []
-            print("Matches found:", matches)
             for r in matches['nodes']:
                 if r['round'] not in roundList:
                     roundList.append(r['round'])
                     unique_rounds.append(r)
             self.rounds = unique_rounds
-            print("Unique rounds:", unique_rounds)
             return unique_rounds       
             
             
@@ -182,7 +177,7 @@ class Tournament:
                     myMatch.set_station(s['id'])
                     myMatch.start_match()
                     s['match'] = match
-                    print(f"Match assigned to station {station_number}.")
+                    print(f"Match assigné à la station {station_number}.")
                     return match
                 else:
                     raise ValueError(f"Station {station_number} is already in use.")
@@ -192,11 +187,11 @@ class Tournament:
         else :
             for s in self.station:
                 if s['number'] == number:
-                    print(f"Station {number} already exists.")
+                    print(f"La station {number} existe deja.")
                     return
         id = self.sgg_request.create_station(self.id, number)
         if id is None:
-            print(f"Station {number} already exists.")
+            print(f"La station {number} existe deja.")
             return
         new_station = {
             'number': number,
@@ -205,7 +200,7 @@ class Tournament:
             'match': None
         }
         self.station.append(new_station)
-        print(f"Station {number} created successfully.")
+        print(f"Station {number} crée avec succès.")
         return new_station
        
     def delete_station(self, number):
@@ -215,26 +210,28 @@ class Tournament:
                     if not s['isUsed']:
                         self.sgg_request.delete_station(s['id'])
                         self.station.remove(s)
-                        print(f"Station {number} deleted successfully.")
+                        print(f"Station {number} supprimée avec succès.")
                         return
                     else:
-                        print(f"Station {number} is currently in use and cannot be deleted.")
+                        print(f"Station {number} est deja utilisée et ne peux pas etre supprimée.")
                         return
-            print(f"Station {number} does not exist.")
+            print(f"Station {number} n'éxiste pas.")
             return
         else:
-            print("No stations available to delete.")
+            print("Pas de station disponible à supprimer.")
             return
     def find_station_available(self):
         if self.station:
             for s in self.station:
                 if not s['isUsed']:
                     return s['number']
-            print("No available stations found.")
+            print("Pas de station disponible.")
             return None
         else:
-            print("No stations available.")
+            print("Pas de station disponible.")
             return None
+    
+
 def sggMatch_to_MyMatch(match, tournament : Tournament):
     if tournament.round_where_bo5_start_winner is not None and tournament.round_where_bo5_start_loser is not None:
         if match['round'] >= tournament.round_where_bo5_start_winner and match['round'] >= 0:

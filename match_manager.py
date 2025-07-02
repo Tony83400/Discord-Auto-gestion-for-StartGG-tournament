@@ -213,9 +213,6 @@ class MatchManager:
             }
             p1_id_sgg = my_match.p1['id']
             p2_id_sgg = my_match.p2['id']
-            print("\nJoueurs : ",my_match.p1, my_match.p2)
-            print("Player List : ",self.player_list,"\n")
-            print("Guild : ",guild)
             member1 = None
             member2 = None
 

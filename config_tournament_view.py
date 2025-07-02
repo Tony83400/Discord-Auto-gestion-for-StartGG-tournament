@@ -255,7 +255,6 @@ class PoolSelector(discord.ui.Select):
         
         if selected_pool_id != "none":
             # Trouver et stocker la pool sélectionnée
-            print(self.tournament.selectedPhase)
             selected_pool = next((pool for pool in self.tournament.selectedPhase['phaseGroups']['nodes'] if str(pool['id']) == selected_pool_id), None)
             if selected_pool:
                 self.tournament.selectedPool = selected_pool

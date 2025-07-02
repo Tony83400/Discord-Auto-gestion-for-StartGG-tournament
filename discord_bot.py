@@ -160,7 +160,8 @@ async def stop_matches(interaction: discord.Interaction):
     num_stations = 0
     if bot.current_tournament:
         for station in bot.current_tournament.station:
-            bot.current_tournament.delete_station(station['number'])
+            station['isUsed'] = False
+            bot.current_tournament.sgg_request.delete_station(station['id'])
             num_stations += 1
     
     bot.match_manager.reset_all_match()

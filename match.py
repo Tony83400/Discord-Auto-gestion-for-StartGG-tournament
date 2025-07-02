@@ -26,7 +26,7 @@ class Match:
     def set_station(self, station_id):
         # Set the station number for the match
         self.stationNumber = station_id
-        print(f"Setting station number: {station_id} for match ID: {self.matchId}")
+        print(f"Station: {station_id} assigné au match : {self.matchId}")
         self.sgg_request.assign_station_to_set(self.matchId, station_id)
     def report_Match(self, isWinnerP1 : bool , characterP1_name : int, characterP2_name: int):
  
