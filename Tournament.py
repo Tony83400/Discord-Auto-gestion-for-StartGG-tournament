@@ -57,7 +57,7 @@ class Tournament:
                     self.playerList.append(newPlayer)
                 for player in self.playerList:
                     if player['discordId'] != None:
-                        self.DiscordIdForPlayer[player['name']] = player['discordId']
+                        self.DiscordIdForPlayer[player['id']] = player['discordId']
             else:
                 raise ValueError("No players found for the selected event.")
         else:

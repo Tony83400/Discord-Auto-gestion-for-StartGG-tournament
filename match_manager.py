@@ -211,10 +211,26 @@ class MatchManager:
             overwrites = {
                 guild.default_role: discord.PermissionOverwrite(view_channel=False)  # cacher pour tous
             }
-            p1_name = my_match.p1['name']
-            p2_name = my_match.p2['name']
-            member1 = guild.get_member(int(self.player_list[p1_name])) if p1_name in self.player_list else None
-            member2 = guild.get_member(int(self.player_list[p2_name])) if p2_name in self.player_list else None
+            p1_id_sgg = my_match.p1['id']
+            p2_id_sgg = my_match.p2['id']
+            print("\nJoueurs : ",my_match.p1, my_match.p2)
+            print("Player List : ",self.player_list,"\n")
+            print("Guild : ",guild)
+            member1 = None
+            member2 = None
+
+            # Vérifier que les IDs existent dans le mapping
+            p1_discord_id = self.tournament.DiscordIdForPlayer.get(p1_id_sgg)
+            p2_discord_id = self.tournament.DiscordIdForPlayer.get(p2_id_sgg)
+            if p1_discord_id is not None:
+                p1_discord_id = int(p1_discord_id)
+            if p2_discord_id is not None:   
+                p2_discord_id = int(p2_discord_id)
+            for m in guild.members:
+                if int(m.id) == p1_discord_id:
+                    member1 = m
+                if int(m.id) == p2_discord_id:
+                    member2 = m
             if member1:
                 overwrites[member1] = discord.PermissionOverwrite(view_channel=True)
             if member2:
@@ -235,17 +251,19 @@ class MatchManager:
                 print("Pas de canal disponible pour le match")
                 return
                 
+            p1_id_sgg = my_match.p1['id']
+            p2_id_sgg = my_match.p2['id']
             p1_name = my_match.p1['name']
             p2_name = my_match.p2['name']
-            if p1_name not in self.tournament.DiscordIdForPlayer :
-                p1_id = p1_name
+            if p1_id_sgg not in self.tournament.DiscordIdForPlayer :
+                p1_id = p1_id_sgg
             else:
-                p1_id = self.tournament.DiscordIdForPlayer[p1_name]
+                p1_id = self.tournament.DiscordIdForPlayer[p1_id_sgg]
                 
-            if p2_name not in self.tournament.DiscordIdForPlayer :
-                p2_id = p2_name
+            if p2_id_sgg not in self.tournament.DiscordIdForPlayer :
+                p2_id = p2_id_sgg
             else:
-                p2_id = self.tournament.DiscordIdForPlayer[p2_name]
+                p2_id = self.tournament.DiscordIdForPlayer[p2_id_sgg]
             await channel.send(f"🎯 **Match démarré** - <@{p1_id}> vs <@{p2_id}> (BO{my_match.bestOf_N})")
             
             # Importer ici pour éviter les imports circulaires

@@ -13,6 +13,7 @@ sggKey = os.getenv('START_GG_KEY')
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # AJOUTEZ ces attributs au bot pour éviter les variables globales
@@ -52,8 +53,30 @@ async def on_ready():
     try:
         synced = await bot.tree.sync()
         print(f"Synchronisé {len(synced)} commande(s) slash")
+   
+        
     except Exception as e:
         print(f"Erreur lors de la synchronisation des commandes: {e}")
+
+    # Création du rôle si il n'existe pas encore
+    role_name = "Tournament Admin"
+    
+    for guild in bot.guilds:
+        existing_role = discord.utils.get(guild.roles, name=role_name)
+
+        if existing_role:
+            print(f"✅ Le rôle '{role_name}' existe déjà sur le serveur : {guild.name}")
+        else:
+            try:
+                new_role = await guild.create_role(
+                    name=role_name,
+                    colour=discord.Colour.blue(),
+                    reason=f"Création automatique par le bot {bot.user.name}"
+                )
+                print(f"✅ Rôle '{role_name}' créé sur le serveur : {guild.name}")
+            except Exception as e:
+                print(f"❌ Erreur lors de la création du rôle sur {guild.name} : {e}")
+
     
     guild = bot.guilds[0] if bot.guilds else None
     if guild:
@@ -236,6 +259,7 @@ async def help_command(interaction: discord.Interaction):
     )
 
     await interaction.response.send_message(embed=embed)
+    
 @bot.tree.command(name="force_refresh", description="[ADMIN] Force un rechargement COMPLET des matchs (en cas de problème)")
 @has_role("Tournament Admin")
 async def force_refresh(interaction: discord.Interaction):
