@@ -54,10 +54,7 @@ class BoSelector(discord.ui.Select):
             self.view.show_custom_selectors()
             
             await interaction.response.edit_message(view=self.view)
-            await interaction.followup.send(
-                "⚙️ Configurez les rounds à partir desquels le format passe en BO5:",
-                ephemeral=True
-            )
+        
         else:
             # Mode simple BO3 ou BO5 pour tous les matchs
             self.view.hide_custom_selectors()
@@ -69,10 +66,7 @@ class BoSelector(discord.ui.Select):
             self.tournament.round_where_bo5_start_loser = None
             
             await interaction.response.edit_message(view=self.view)
-            await interaction.followup.send(
-                f"✅ Format sélectionné: **Best of {selected_value}** pour tous les matchs",
-                ephemeral=True
-            )
+      
 
 
 class RoundBoSelector(discord.ui.Select):
@@ -148,17 +142,6 @@ class RoundBoSelector(discord.ui.Select):
         
         await interaction.response.edit_message(view=self.view)
         
-        # Message de confirmation
-        if selected_round is None:
-            message = f"✅ Tous les matchs en {self.bracket_type} bracket resteront en BO3"
-        else:
-            round_name = next((m['fullRoundText'] for m in self.tournament.get_round_of_match() 
-                             if m['round'] == selected_round), f"Round {abs(selected_round)}")
-            message = (f"✅ Les matchs en {self.bracket_type} bracket seront en:\n"
-                      f"- BO3 avant le {round_name}\n"
-                      f"- BO5 à partir du {round_name} (inclus)")
-        
-        await interaction.followup.send(message, ephemeral=True)
 
 
 class SetupCountSelector(discord.ui.Select):
@@ -196,10 +179,7 @@ class SetupCountSelector(discord.ui.Select):
             for option in self.options:
                 option.default = (option.value == self.values[0])
             
-            await interaction.response.send_message(
-                f"✅ Nombre de setups: **{self.values[0]}**",
-                ephemeral=True
-            )
+            await interaction.response.defer(ephemeral=True)
 
 class CustomSetupCountModal(discord.ui.Modal):
     def __init__(self, match_config_view):
@@ -244,10 +224,7 @@ class CustomSetupCountModal(discord.ui.Modal):
             new_view.first_setup_number = self.match_config_view.first_setup_number
             
             await interaction.response.edit_message(view=new_view)
-            await interaction.followup.send(
-                f"✅ Nombre de setups personnalisé: **{new_count}**",
-                ephemeral=True
-            )
+          
             
         except ValueError:
             await interaction.response.send_message(
@@ -280,19 +257,14 @@ class SetupNumberModal(discord.ui.Modal):
                 )
                 return
             
+            # Mettre à jour la vue existante au lieu d'en créer une nouvelle
             self.match_config_view.first_setup_number = new_number
             self.match_config_view.update_setup_button_label()
             
-            # Recréer la vue pour mettre à jour l'affichage
-            new_view = SetupAndBestOfConfig(
-                self.match_config_view.tournament,
-                self.match_config_view.bot
-            )
-            new_view.selected_bo = self.match_config_view.selected_bo
-            new_view.num_setups = self.match_config_view.num_setups
-            new_view.first_setup_number = self.match_config_view.first_setup_number
+            # Mettre à jour le message existant
+            await interaction.response.edit_message(view=self.match_config_view)
             
-            await interaction.response.edit_message(view=new_view)
+       
             
         except ValueError:
             await interaction.response.send_message(
@@ -302,46 +274,60 @@ class SetupNumberModal(discord.ui.Modal):
 
 class SetupAndBestOfConfig(discord.ui.View):
     def __init__(self, tournament, bot):
-        super().__init__(timeout=300)  # 5 minutes de timeout
+        super().__init__(timeout=300)
         self.tournament = tournament
         self.bot = bot
         
-        # Valeurs par défaut
+        # Initialize default values
         self.selected_bo = "3"
         self.num_setups = 2
         self.first_setup_number = 1
         self.custom_selectors_visible = False
         
-        # Ajouter les composants - CHANGEMENT ICI
-        self.bo_selector = BoSelector(self.tournament)
-        self.winner_selector = RoundBoSelector(self.tournament, "winner")
-        self.loser_selector = RoundBoSelector(self.tournament, "loser")
+        # Initialize UI components
+        self.initialize_components()
         
-        # Ajouter seulement le sélecteur principal au départ
-        self.add_item(self.bo_selector)
-        self.add_item(SetupCountSelector())
+        # Add default components
+        self.add_default_components()
         
-        # Afficher les sélecteurs custom si c'est déjà configuré
+        # Add custom selectors if needed
         if getattr(tournament, 'bo_custom', False):
             self.show_custom_selectors()
         
-        # Bouton pour configurer le numéro de premier setup
-        setup_number_button = discord.ui.Button(
+        # Add validation button
+        self.add_validation_button()
+
+    def initialize_components(self):
+        """Initialize all UI components"""
+        self.bo_selector = BoSelector(self.tournament)
+        self.winner_selector = RoundBoSelector(self.tournament, "winner")
+        self.loser_selector = RoundBoSelector(self.tournament, "loser")
+        self.setup_count_selector = SetupCountSelector()
+        
+        # Setup number button
+        self.setup_number_button = discord.ui.Button(
             label=f"Premier setup: #{self.first_setup_number}",
             style=discord.ButtonStyle.secondary,
             custom_id="setup_number_config"
         )
-        setup_number_button.callback = self.configure_setup_number
-        self.add_item(setup_number_button)
-        
-        # Bouton de validation finale
+        self.setup_number_button.callback = self.configure_setup_number
+
+    def add_default_components(self):
+        """Add default components to the view"""
+        self.add_item(self.bo_selector)
+        self.add_item(self.setup_count_selector)
+        self.add_item(self.setup_number_button)
+
+    def add_validation_button(self):
+        """Add the validation button"""
         validate_button = discord.ui.Button(
-            label="🚀 Lancer le tournoi",
+            label="🚀 Finir la configuration",
             style=discord.ButtonStyle.success,
             custom_id="launch_tournament"
         )
         validate_button.callback = self.launch_tournament
         self.add_item(validate_button)
+
 
     def show_custom_selectors(self):
         """Affiche les sélecteurs pour la configuration par round"""
@@ -371,7 +357,7 @@ class SetupAndBestOfConfig(discord.ui.View):
     def update_setup_button_label(self):
         """Met à jour le label du bouton de configuration du setup"""
         for item in self.children:
-            if hasattr(item, 'custom_id') and item.custom_id == "setup_number_config":
+            if isinstance(item, discord.ui.Button) and item.custom_id == "setup_number_config":
                 item.label = f"Premier setup: #{self.first_setup_number}"
                 break
                 
@@ -410,19 +396,19 @@ class SetupAndBestOfConfig(discord.ui.View):
             
             # Créer l'embed de confirmation
             embed = discord.Embed(
-                title="🚀 Tournoi lancé avec succès !",
+                title="🚀 Tournoi configuré avec succès !",
                 color=0x00ff00
             )
             
             embed.add_field(
                 name="⚔️ Format de match",
-                value=f"Bo{self.selected_bo}" if self.selected_bo != "custom" else "Format personnalisé",
+                value=f"Bo{self.selected_bo}" if self.selected_bo != "custom" else "Bo3/BO5",
                 inline=True
             )
             
             embed.add_field(
                 name="🖥️ Setups",
-                value=f"{self.num_setups} setup(s)",
+                value=f"{self.num_setups} setups" if self.num_setups > 1 else "1 setup",
                 inline=True
             )
             
@@ -444,13 +430,24 @@ class SetupAndBestOfConfig(discord.ui.View):
                     value=f"{self.tournament.selectedEvent['name']} ({self.tournament.selectedEvent['numEntrants']} participants)",
                     inline=False
                 )
+            embed.add_field(
+                name="📅 Pool",
+                value=f"{self.tournament.selectedPhase['name']} - {self.tournament.selectedPool['displayIdentifier']}",
+                inline=False
+            )
+
+            embed.add_field(
+                name="✅ Lancer le tournoi",
+                value="Avec la commande `/start_matches`",
+                inline=False
+            )
             
             await interaction.followup.send(
                 embed=embed,
                 ephemeral=True
             )
             
-            print(f"Tournoi lancé: Bo{self.selected_bo}, {self.num_setups} setups (#{self.first_setup_number}-#{self.first_setup_number + self.num_setups - 1})")
+            print(f"Tournoi confguré: Bo{self.selected_bo}, {self.num_setups} setups (#{self.first_setup_number}-#{self.first_setup_number + self.num_setups - 1})")
             
         except Exception as e:
             await interaction.followup.send(

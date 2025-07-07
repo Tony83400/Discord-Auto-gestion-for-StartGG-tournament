@@ -2,7 +2,7 @@
 import discord
 
 from models.tournament import Tournament
-from view.Setup_and_bestOf_config import MatchConfigurationView
+from view.Setup_and_bestOf_config import SetupAndBestOfConfig
 
 
 class EventSelector(discord.ui.Select):
@@ -126,10 +126,7 @@ class PoolSelector(discord.ui.Select):
                 self.tournament.selectedPool = selected_pool
                 self.tournament.select_pool(selected_pool_id)
             
-            await interaction.response.send_message(
-                f"✅ Poule sélectionnée ", 
-                ephemeral=True
-            )
+            await interaction.response.defer(ephemeral=True)
         else:
             await interaction.response.send_message("Aucune poule disponible", ephemeral=True)
 
@@ -191,7 +188,7 @@ class TournamentView(discord.ui.View):
         )
         
         # Créer la vue de configuration des matchs
-        match_config_view = MatchConfigurationView(tournament, self.bot)
+        match_config_view = SetupAndBestOfConfig(tournament, self.bot)
         
         await interaction.response.send_message(
             embed=embed,

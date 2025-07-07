@@ -51,47 +51,39 @@ def has_role(role_name: str):
 
 @bot.event
 async def on_ready():
-    print(f"✅ Bot connecté en tant que {bot.user.name} ({bot.user.id})")
+    print(f"✅ Bot connecté en tant que {bot.user.name}")
+    
+    # Sync commands
     try:
         synced = await bot.tree.sync()
-        print(f"✅ Synchronisé {len(synced)} commande(s) slash")
+        print(f"✅ {len(synced)} commandes synchronisées")
     except Exception as e:
-        print(f"❌ Erreur lors de la synchronisation des commandes: {e}")
+        print(f"❌ Sync failed: {e}")
 
-    role_name = "Tournament Admin"
-
+    # Vérification admin pour chaque serveur
     for guild in bot.guilds:
-        print(f"🔗 Connecté au serveur : {guild.name} ({guild.id})")
-
-        # Vérification si le rôle existe déjà
-        existing_role = discord.utils.get(guild.roles, name=role_name)
-
-        if existing_role:
-            print(f"✅ Le rôle '{role_name}' existe déjà sur : {guild.name}")
+        print(f"\n🔗 Serveur: {guild.name}")
+        me = guild.me
+        
+        if me.guild_permissions.administrator:
+            print("✅ Bot est ADMIN - Toutes permissions OK")
         else:
-            try:
-                await guild.create_role(
-                    name=role_name,
-                    colour=discord.Colour.blue(),
-                    reason=f"Création automatique par le bot {bot.user.name}"
-                )
-                print(f"✅ Rôle '{role_name}' créé sur : {guild.name}")
-            except discord.Forbidden:
-                print(f"❌ Permissions insuffisantes pour créer le rôle sur : {guild.name}")
-            except Exception as e:
-                print(f"❌ Erreur lors de la création du rôle sur {guild.name} : {e}")
-
-        # Vérification des permissions du bot sur chaque serveur
+            print("❌ Bot n'est PAS admin")
+            print("   → Donnez la permission 'Administrateur' au rôle du bot")
+        role_name = "Tournament Admin"
         try:
-            me = guild.me  # Le bot lui-même dans ce serveur
-            bot_permissions = me.guild_permissions
-
-            if bot_permissions.manage_roles and bot_permissions.send_messages:
-                print(f"✅ Le bot a les permissions nécessaires sur : {guild.name}")
-            else:
-                print(f"⚠️ Attention : Le bot pourrait ne pas avoir toutes les permissions nécessaires sur : {guild.name}")
+            role = discord.utils.get(guild.roles, name=role_name) or \
+                   await guild.create_role(
+                       name=role_name,
+                       color=discord.Color.blue(),
+                       reason="Auto-created by bot"
+                   )
+            print(f"✅ Rôle '{role_name}' configuré")
+        except discord.Forbidden:
+            print("❌ Impossible de gérer les rôles (permission manquante)")
         except Exception as e:
-            print(f"❌ Erreur lors de la vérification des permissions sur {guild.name} : {e}")
+            print(f"❌ Erreur rôle: {e}")
+    print("\n🔗 Bot prêt !")
 
 @bot.tree.command(name="setup_tournament", description="Configure un tournoi pour la gestion automatique")
 @has_role("Tournament Admin")

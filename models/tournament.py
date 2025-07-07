@@ -17,6 +17,7 @@ class Tournament:
         self.IsAdmin = None
         self.selectedPhaseId = None
         self.selectedPoolId = None
+        self.selectedPool = None
         self.playerList = []
         self.DiscordIdForPlayer = {}
         self.selectedPhase = None
@@ -101,6 +102,11 @@ class Tournament:
     def select_pool(self, pool_id: int):
         if self.selectedEvent:
             self.selectedPoolId = pool_id
+            for pool in self.selectedPhase.get('phaseGroups', [])['nodes']:
+                if int(pool['id']) == int(pool_id):
+                    print(pool)
+                    self.selectedPool = pool
+                    self._set_player_list()
         else:
             raise ValueError("No event selected. Please select an event first.")
     def order_match(self,matchList):
