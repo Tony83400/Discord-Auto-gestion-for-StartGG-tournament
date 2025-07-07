@@ -55,14 +55,24 @@ class MatchManager:
                     self.pending_matches.append(match)
             
             if new_pending_matches and interaction:
-                await interaction.followup.send(f"🔄 {len(new_pending_matches)} nouveaux matchs détectés et ajoutés à la file")
+                try:
+                    # Essayer d'utiliser followup d'abord
+                    await interaction.followup.send(f"🔄 {len(new_pending_matches)} nouveaux matchs détectés et ajoutés à la file")
+                except discord.errors.NotFound:
+                    # Si followup échoue, essayer d'envoyer un nouveau message
+                    if hasattr(interaction, 'channel') and interaction.channel:
+                        await interaction.channel.send(f"🔄 {len(new_pending_matches)} nouveaux matchs détectés et ajoutés à la file")
             
             return len(new_pending_matches)
             
         except Exception as e:
             print(f"Erreur lors de l'actualisation des matchs: {e}")
             if interaction:
-                await interaction.followup.send(f"❌ Erreur lors de l'actualisation: {e}")
+                try:
+                    await interaction.followup.send(f"❌ Erreur lors de l'actualisation: {e}")
+                except discord.errors.NotFound:
+                    if hasattr(interaction, 'channel') and interaction.channel:
+                        await interaction.channel.send(f"❌ Erreur lors de l'actualisation: {e}")
             return 0
     
     async def start_match_processing(self, interaction):

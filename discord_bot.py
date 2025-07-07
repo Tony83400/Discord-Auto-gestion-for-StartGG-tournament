@@ -6,6 +6,7 @@ from discord.ext import commands
 from discord import app_commands
 from view.tournament_link import TournamentModal
 
+
 load_dotenv()  # Charge le fichier .env
 
 token = os.getenv('DISCORD_BOT_TOKEN')
@@ -298,49 +299,10 @@ async def help_command(interaction: discord.Interaction):
 
     await interaction.response.send_message(embed=embed)
     
-@bot.tree.command(name="force_refresh", description="[ADMIN] Force un rechargement COMPLET des matchs (en cas de problème)")
+@bot.tree.command(name="force_refresh", description="[ADMIN] Force un rechargement COMPLET des matchs")
 @has_role("Tournament Admin")
 async def force_refresh(interaction: discord.Interaction):
-    """Recharge intégralement la liste des matchs et nettoie les états"""
-    if not bot.match_manager:
-        await interaction.response.send_message("❌ Aucun gestionnaire configuré.")
-        return
-    global current_tournament_guild_id
-
-    if current_tournament_guild_id != interaction.guild.id:
-        await interaction.response.send_message(
-            "❌ Le tournoi actuel est sur un autre serveur.",
-            ephemeral=True
-        )
-        return
-    await interaction.response.defer()
-    
-    # 1. Nettoyer les états existants
-    bot.match_manager.pending_matches.clear()
-    if hasattr(bot.match_manager, 'active_matches'):
-        bot.match_manager.active_matches.clear()
-    
-    # 2. Rechargement complet depuis l'API
-    try:
-        matches = bot.tournament.get_matches(state=1)  # Matchs non commencés
-        bot.match_manager.pending_matches = matches.copy()
-        
-        # 3. Réinitialiser les stations
-        if bot.current_tournament:
-            for station in bot.current_tournament.station:
-                station['isUsed'] = False
-                if 'current_match' in station:
-                    del station['current_match']
-        
-        await interaction.followup.send(
-            f"♻️ **Rechargement forcé réussi !**\n"
-            f"• {len(matches)} matchs en attente\n"
-            f"• Toutes stations réinitialisées\n"
-            f"• États internes nettoyés"
-        )
-        
-    except Exception as e:
-        error_msg = f"❌ Échec du rechargement : {str(e)}"
-        print(error_msg)
-        await interaction.followup.send(error_msg)
+    await interaction.response.defer()  # Important pour éviter l'expiration trop rapide
+    await bot.match_manager.refresh_matches_list(interaction)
+    await interaction.followup.send("🔄 Rechargement complet des matchs effectué")
 bot.run(token)

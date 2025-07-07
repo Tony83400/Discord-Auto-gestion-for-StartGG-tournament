@@ -65,23 +65,27 @@ class StartGG:
     def get_event_phases(self, event_id: str) -> Optional[Dict[str, Any]]:
         """Récupère les phases d'un événement par son ID."""
         query = """
- query EventPhases($eventId: ID!) {
-      event(id: $eventId) {
-                            id
-                            name
-                            numEntrants
-                            phases {
+            query EventPhases($eventId: ID!) {
+                event(id: $eventId) {
+                    id
+                    name
+                    numEntrants
+                    phases {
+                        id
+                        name
+                        phaseGroups {
+                            nodes {
                                 id
-                                name
-                                phaseGroups {
-                                    nodes {
-                                        id
-                                        displayIdentifier
-                                    }
-                                }
+                                displayIdentifier
                             }
                         }
-}
+                    }
+                    videogame {
+                        id
+                    }
+                }
+            }
+
         """
         variables = {"eventId": event_id}
         response = self._make_request(query, variables)

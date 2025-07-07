@@ -65,6 +65,9 @@ class Tournament:
             raise ValueError("No event selected. Please select an event first.")
     def select_event(self, event_id :int):
         self.selectedEvent = self.sgg_request.get_event_phases(event_id)
+        if self.selectedEvent:
+            self._set_player_list()
+            self.characterList = self.sgg_request.get_all_characters(self.selectedEvent['videogame']['id'])  # Mettre à jour la liste des personnages pour l'événement sélectionné
     def select_event_by_name(self, event_name: str):
         event_name = event_name.replace('-', ' ')
         if self.events:
