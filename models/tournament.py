@@ -1,5 +1,5 @@
-from startgg_request import StartGG
-from match import Match
+from models.startgg_request import StartGG
+from models.match import Match
 from dotenv import load_dotenv
 import os
 

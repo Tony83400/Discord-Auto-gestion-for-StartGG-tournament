@@ -2,8 +2,8 @@ import asyncio
 from typing import Dict, List
 import discord
 from discord.ext import commands
-from match import Match
-from tournament import Tournament, sggMatch_to_MyMatch
+from models.match import Match
+from models.tournament import Tournament, sggMatch_to_MyMatch
 
 class MatchManager:
     def __init__(self, bot: commands.Bot, tournament: Tournament):
@@ -264,7 +264,7 @@ class MatchManager:
             await channel.send(f"🎯 **Match démarré** - <@{p1_id}> vs <@{p2_id}> (BO{my_match.bestOf_N})")
             
             # Importer ici pour éviter les imports circulaires
-            from match_report import send_match_report
+            from view.match_report import send_match_report
             
             # Boucle des games
             for game_num in range(1, my_match.bestOf_N + 1):

@@ -4,7 +4,7 @@ import discord
 from functools import wraps
 from discord.ext import commands
 from discord import app_commands
-from config_tournament_view import TournamentModal
+from view.tournament_link import TournamentModal
 
 load_dotenv()  # Charge le fichier .env
 
