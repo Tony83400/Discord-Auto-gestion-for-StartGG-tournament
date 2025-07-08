@@ -1,6 +1,7 @@
 
-import discord
 
+import discord
+from models.lang import translate
 from models.tournament import Tournament
 
 
@@ -10,23 +11,23 @@ class BoSelector(discord.ui.Select):
         
         options = [
             discord.SelectOption(
-                label="Best of 3 (tous les matchs)",
+                label="BO3",
                 value="3",
-                description="Tous les matchs en BO3",
+                description=translate("all_matches_in", bo="BO3"),
                 emoji="3️⃣",
                 default=True
             ),
             discord.SelectOption(
-                label="Best of 5 (tous les matchs)",
+                label="BO5",
                 value="5",
-                description="Tous les matchs en BO5",
+                description=translate("all_matches_in", bo="BO5"),
                 emoji="5️⃣",
                 default=False
             ),
             discord.SelectOption(
-                label="Format personnalisé (par round)",
+                label=translate("custom_format_label"),
                 value="custom",
-                description="BO3 avant certains rounds, BO5 après",
+                description=translate("custom_format_desc"),
                 emoji="⚙️",
                 default=False
             )
@@ -94,15 +95,15 @@ class RoundBoSelector(discord.ui.Select):
                 options.append(discord.SelectOption(
                     label=match['fullRoundText'],
                     value=str(round_num),
-                    description=f"À partir de ce round: BO5",
+                    description=translate("from_this_round", bo="BO5") ,
                     default=(round_num == current_round)
                 ))
         
         # Option pour ne jamais passer en BO5 dans ce bracket
         never_option = discord.SelectOption(
-            label=f"Toujours BO3 ({bracket_type} bracket)",
+            label=f"Full BO3 ({bracket_type} bracket)",
             value="0",
-            description=f"Ne jamais passer en BO5 dans le {bracket_type} bracket",
+            description=translate("never_bo5_in_bracket", bracket_type=bracket_type),
             emoji="❌",
             default=(current_round is None)
         )
@@ -235,11 +236,13 @@ class CustomSetupCountModal(discord.ui.Modal):
 
 class SetupNumberModal(discord.ui.Modal):
     def __init__(self, match_config_view):
-        super().__init__(title="Configuration du premier setup")
+        super().__init__(title=translate("setup_number_config_title"))
         self.match_config_view = match_config_view
         
+        
+        label = translate("Setup_numbers")
         self.setup_number_input = discord.ui.TextInput(
-            label="Numéro du premier setup",
+            label=label,
             placeholder="1",
             default=str(match_config_view.first_setup_number),
             required=True,
@@ -252,7 +255,7 @@ class SetupNumberModal(discord.ui.Modal):
             new_number = int(self.setup_number_input.value)
             if new_number < 1:
                 await interaction.response.send_message(
-                    "❌ Le numéro du setup doit être supérieur à 0.",
+                    translate("setup_number_invalid"),
                     ephemeral=True
                 )
                 return
@@ -268,7 +271,7 @@ class SetupNumberModal(discord.ui.Modal):
             
         except ValueError:
             await interaction.response.send_message(
-                "❌ Veuillez entrer un nombre valide.",
+                translate("setup_number_invalid"),
                 ephemeral=True
             )
 
@@ -306,7 +309,7 @@ class SetupAndBestOfConfig(discord.ui.View):
         
         # Setup number button
         self.setup_number_button = discord.ui.Button(
-            label=f"Premier setup: #{self.first_setup_number}",
+            label=translate("setup_number_config_label", first_setup_number=self.first_setup_number),
             style=discord.ButtonStyle.secondary,
             custom_id="setup_number_config"
         )
@@ -321,7 +324,7 @@ class SetupAndBestOfConfig(discord.ui.View):
     def add_validation_button(self):
         """Add the validation button"""
         validate_button = discord.ui.Button(
-            label="🚀 Finir la configuration",
+            label=translate("launch_tournament_label"),
             style=discord.ButtonStyle.success,
             custom_id="launch_tournament"
         )
@@ -358,7 +361,7 @@ class SetupAndBestOfConfig(discord.ui.View):
         """Met à jour le label du bouton de configuration du setup"""
         for item in self.children:
             if isinstance(item, discord.ui.Button) and item.custom_id == "setup_number_config":
-                item.label = f"Premier setup: #{self.first_setup_number}"
+                item.label = translate("setup_number_config_label", first_setup_number=self.first_setup_number)
                 break
                 
     async def launch_tournament(self, interaction: discord.Interaction):
@@ -374,7 +377,6 @@ class SetupAndBestOfConfig(discord.ui.View):
             for i in range(self.num_setups):
                 setup_number = self.first_setup_number + i
                 self.tournament.create_station(setup_number)
-                print(f"Station {setup_number} créée avec succès")
             
             # Créer le gestionnaire de matchs avec la configuration BO
             from models.match_manager import MatchManager
@@ -395,59 +397,60 @@ class SetupAndBestOfConfig(discord.ui.View):
                 self.bot.match_manager = match_manager
             
             # Créer l'embed de confirmation
+
             embed = discord.Embed(
-                title="🚀 Tournoi configuré avec succès !",
+                title=translate("tournament_config_success"),
                 color=0x00ff00
             )
-            
+
             embed.add_field(
-                name="⚔️ Format de match",
-                value=f"Bo{self.selected_bo}" if self.selected_bo != "custom" else "Bo3/BO5",
+                name=translate("match_format_label"),
+                value=translate("bo_format_value", bo=self.selected_bo) if self.selected_bo != "custom" else translate("bo_format_custom"),
                 inline=True
             )
-            
+
             embed.add_field(
-                name="🖥️ Setups",
-                value=f"{self.num_setups} setups" if self.num_setups > 1 else "1 setup",
+                name=translate("setups_label"),
+                value=translate("setups_value", count=self.num_setups),
                 inline=True
             )
-            
+
             embed.add_field(
-                name="🔢 Numérotation",
-                value=f"Setup #{self.first_setup_number} à #{self.first_setup_number + self.num_setups - 1}",
+                name=translate("setup_numbering_label"),
+                value=translate("setup_numbering_value", first=self.first_setup_number, last=self.first_setup_number + self.num_setups - 1),
                 inline=True
             )
-            
+
             embed.add_field(
-                name="🎮 Tournoi",
+                name=translate("tournament_label"),
                 value=f"{self.tournament.name}",
                 inline=False
             )
-            
+
             if hasattr(self.tournament, 'selectedEvent') and self.tournament.selectedEvent:
                 embed.add_field(
-                    name="📊 Événement",
-                    value=f"{self.tournament.selectedEvent['name']} ({self.tournament.selectedEvent['numEntrants']} participants)",
+                    name=translate("event_label"),
+                    value=translate("event_value", name=self.tournament.selectedEvent['name'], numEntrants=self.tournament.selectedEvent['numEntrants']),
                     inline=False
                 )
             embed.add_field(
-                name="📅 Pool",
-                value=f"{self.tournament.selectedPhase['name']} - {self.tournament.selectedPool['displayIdentifier']}",
+                name=translate("pool_label"),
+                value=translate("pool_value", phase=self.tournament.selectedPhase['name'], pool=self.tournament.selectedPool['displayIdentifier']),
                 inline=False
             )
 
             embed.add_field(
-                name="✅ Lancer le tournoi",
-                value="Avec la commande `/start_matches`",
+                name=translate("launch_label"),
+                value=translate("launch_value"),
                 inline=False
             )
-            
+
             await interaction.followup.send(
                 embed=embed,
                 ephemeral=True
             )
-            
-            print(f"Tournoi confguré: Bo{self.selected_bo}, {self.num_setups} setups (#{self.first_setup_number}-#{self.first_setup_number + self.num_setups - 1})")
+
+            print(translate("tournament_config_log", bo=self.selected_bo, count=self.num_setups, first=self.first_setup_number, last=self.first_setup_number + self.num_setups - 1))
             
         except Exception as e:
             await interaction.followup.send(

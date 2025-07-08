@@ -49,6 +49,8 @@ Assurez-vous d'avoir Python 3.11 ou supérieur installé
 
 Exécutez le fichier setup.py (une seule fois)
 
+Allez dans le fichier .env et verifier la valeur de LANG :  LANG="en"
+
 ✅ Votre bot est prêt à l'emploie
 
 Lancer le bot

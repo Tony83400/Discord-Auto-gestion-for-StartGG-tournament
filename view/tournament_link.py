@@ -1,16 +1,19 @@
-import discord
 
+import discord
+from models.lang import translate
 from models.tournament import Tournament
 from view.event_selector_view import TournamentView
 
 
 class TournamentModal(discord.ui.Modal):
     def __init__(self, bot=None):
-        super().__init__(title="Configuration du Tournoi")
+        # Truncate title and label to 45 chars max (Discord UI limit)
+        title = translate("tournament_config_title")
+        label = translate("tournament_link_label")
+        super().__init__(title=title)
         self.bot = bot  # Stocker la référence du bot
-        
         self.tournament_link = discord.ui.TextInput(
-            label="Lien du tournoi",
+            label=label,
             placeholder="https://start.gg/tournament/mon-tournoi",
             required=True,
             max_length=200
@@ -28,8 +31,7 @@ class TournamentModal(discord.ui.Modal):
         # Validation du lien start.gg
         if not self._is_valid_startgg_link(link_parts):
             await interaction.followup.send(
-                "❌ Le lien doit être au format : `https://start.gg/tournament/nom-du-tournoi`\n"
-                "Exemple : `https://start.gg/tournament/evo-2024`", 
+                translate("invalid_link_format"),
                 ephemeral=True
             )
             return
@@ -39,7 +41,7 @@ class TournamentModal(discord.ui.Modal):
         
         if not tournament_slug:
             await interaction.followup.send(
-                "❌ Impossible d'extraire le nom du tournoi depuis le lien.", 
+                translate("extract_slug_error"),
                 ephemeral=True
             )
             return
@@ -55,14 +57,14 @@ class TournamentModal(discord.ui.Modal):
         # Vérifications
         if tournament.id is None:
             await interaction.followup.send(
-                f"❌ Tournoi '{tournament_slug}' non trouvé. Vérifiez le lien et réessayez.", 
+                translate("tournament_not_found", slug=tournament_slug),
                 ephemeral=True
             )
             return
             
         if not tournament.IsAdmin:
             await interaction.followup.send(
-                "❌ La clé start.gg associée doit avoir les droits admin pour gérer ce tournoi.", 
+                translate("admin_rights_required"),
                 ephemeral=True
             )
             return
@@ -75,11 +77,15 @@ class TournamentModal(discord.ui.Modal):
         
         # Message de succès avec informations du tournoi
         embed = discord.Embed(
-            title="✅ Tournoi configuré avec succès !",
+            title=translate("tournament_config_success"),
             description=f"**{tournament.name}**",
             color=0x00ff00
         )
-        embed.add_field(name="🎮 Événements", value=len(tournament.events), inline=True)
+        embed.add_field(
+            name=translate("events_label"),
+            value=len(tournament.events),
+            inline=True
+        )
         
         await interaction.followup.send(
             embed=embed,

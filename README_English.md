@@ -29,6 +29,8 @@ Copy the link and paste it in your navigator , select the server for your tourna
 You need to have at least python 3.11 install
 Execute the "setup.py" file (you need to execute it only one time)
 
+Go to the .env file and set LANG="en"
+
 Your bot is ready to use ! 
 
 Now you can just execute the "discord_bot.py" file to start your bot 

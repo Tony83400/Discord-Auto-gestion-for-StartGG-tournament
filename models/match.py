@@ -1,4 +1,6 @@
 
+from models.lang import translate
+
 class Match:
     def __init__(self, p1,p2 , matchId , bestOf_N , startGG):
         self.p1 = p1
@@ -26,7 +28,7 @@ class Match:
     def set_station(self, station_id):
         # Set the station number for the match
         self.stationNumber = station_id
-        print(f"Station: {station_id} assigné au match : {self.matchId}")
+        print(translate("station_assigned_log", station=station_id, match=self.matchId))
         self.sgg_request.assign_station_to_set(self.matchId, station_id)
     def report_Match(self, isWinnerP1 : bool , characterP1_name : int, characterP2_name: int):
  
@@ -69,5 +71,5 @@ class Match:
             )
             return result.get('success', False)
         except Exception as e:
-            print(f"Erreur report start.gg: {e}")
+            print(translate("startgg_report_error", error=e))
             return False

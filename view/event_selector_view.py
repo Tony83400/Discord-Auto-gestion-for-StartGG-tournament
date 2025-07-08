@@ -1,6 +1,7 @@
 
-import discord
 
+import discord
+from models.lang import translate
 from models.tournament import Tournament
 from view.Setup_and_bestOf_config import SetupAndBestOfConfig
 
@@ -11,15 +12,13 @@ class EventSelector(discord.ui.Select):
         options = []
         for i, event in enumerate(tournament.events):
             is_default = (hasattr(tournament, 'selectedEvent') and tournament.selectedEvent and str(event['id']) == str(tournament.selectedEvent['id']))
-            
             options.append(discord.SelectOption(
-                label=f"{event['name']} ({event['numEntrants']} participants)",
+                label=translate("event_option_label", name=event['name'], numEntrants=event['numEntrants']),
                 value=str(event['id']),
                 default=is_default
             ))
-            
         super().__init__(
-            placeholder="Sélectionnez un événement", 
+            placeholder=translate("event_select_placeholder"),
             options=options
         )
         self.tournament = tournament
@@ -41,7 +40,7 @@ class EventSelector(discord.ui.Select):
         new_view = TournamentView(self.tournament, self.view.bot)  # Passer le bot
         
         await interaction.response.edit_message(
-            content=f"✅ Événement sélectionné : **{selected_event['name']}**", 
+            content=translate("event_selected", name=selected_event['name']),
             view=new_view
         )
 
@@ -51,8 +50,8 @@ class PhaseSelector(discord.ui.Select):
         self.tournament = tournament
         
         if not tournament.selectedEvent :
-            print("Aucune phase disponible pour l'événement sélectionné.")
-            options = [discord.SelectOption(label="Aucune phase disponible", value="none")]
+            print(translate("no_phase_available"))
+            options = [discord.SelectOption(label=translate("no_phase_available"), value="none")]
             disabled = True
         else:
             options = []
@@ -68,9 +67,8 @@ class PhaseSelector(discord.ui.Select):
                     default=is_default
                 ))
             disabled = False
-        
         super().__init__(
-            placeholder="Sélectionnez une phase", 
+            placeholder=translate("phase_select_placeholder"),
             options=options,
             disabled=disabled
         )
@@ -92,10 +90,10 @@ class PoolSelector(discord.ui.Select):
        
         options = []
         if selectedPhase is None:
-            print("Aucune poule disponible pour la phase sélectionnée.")
-            options = [discord.SelectOption(label="Aucune poule disponible", value="none")]
+            print(translate("no_pool_available"))
+            options = [discord.SelectOption(label=translate("no_pool_available"), value="none")]
             disabled = True
-            super().__init__(placeholder="Aucune poule disponible", options=options, disabled=disabled)
+            super().__init__(placeholder=translate("no_pool_available"), options=options, disabled=disabled)
             return
         for pool in selectedPhase.get('phaseGroups', [])['nodes']:
             is_default = bool(
@@ -104,14 +102,14 @@ class PoolSelector(discord.ui.Select):
                 str(pool['id']) == str(tournament.selectedPoolId)
             )
             options.append(discord.SelectOption(
-                label=pool['displayIdentifier'], 
+                label=pool['displayIdentifier'],
                 value=str(pool['id']),
                 default=is_default
             ))
         disabled = False
     
         super().__init__(
-            placeholder="Sélectionnez une poule", 
+            placeholder=translate("pool_select_placeholder"),
             options=options, 
             disabled=disabled
         )
@@ -128,7 +126,7 @@ class PoolSelector(discord.ui.Select):
             
             await interaction.response.defer(ephemeral=True)
         else:
-            await interaction.response.send_message("Aucune poule disponible", ephemeral=True)
+            await interaction.response.send_message(translate("no_pool_available"), ephemeral=True)
 
 
 class TournamentView(discord.ui.View):
@@ -144,7 +142,7 @@ class TournamentView(discord.ui.View):
 
         # Bouton de validation
         validate_button = discord.ui.Button(
-            label="✅ Valider la configuration", 
+            label=translate("validate_config_label"),
             style=discord.ButtonStyle.success,
             custom_id="validate_tournament"
         )
@@ -152,22 +150,21 @@ class TournamentView(discord.ui.View):
         self.add_item(validate_button)
 
     async def validate_configuration(self, interaction: discord.Interaction):
-        print("Validation de la configuration du tournoi")
         
         config_summary = []
         
         if hasattr(self.tournament, 'selectedEvent') and self.tournament.selectedEvent:
-            config_summary.append(f"🎮 **Événement** : {self.tournament.selectedEvent['name']}")
-        
+            config_summary.append(translate("config_event_summary", name=self.tournament.selectedEvent['name']))
+
         if hasattr(self.tournament, 'selectedPhase') and self.tournament.selectedPhase:
-            config_summary.append(f"📊 **Phase** : {self.tournament.selectedPhase['name']}")
-            
+            config_summary.append(translate("config_phase_summary", name=self.tournament.selectedPhase['name']))
+
         if hasattr(self.tournament, 'selectedPool') and self.tournament.selectedPool:
-            config_summary.append(f"🏊 **Poule** : {self.tournament.selectedPool['displayIdentifier']}")
+            config_summary.append(translate("config_pool_summary", displayIdentifier=self.tournament.selectedPool['displayIdentifier']))
 
         if not config_summary:
             await interaction.response.send_message(
-                "❌ Veuillez sélectionner au moins un événement avant de valider.", 
+                translate("select_event_before_validate"),
                 ephemeral=True
             )
             return
@@ -177,13 +174,13 @@ class TournamentView(discord.ui.View):
         tournament._set_player_list()
         
         embed = discord.Embed(
-            title="✅ Configuration du tournoi validée !",
+            title=translate("tournament_validated_title"),
             description="\n".join(config_summary),
             color=0x00ff00
         )
         embed.add_field(
-            name="➡️ Étape suivante",
-            value="Configurez maintenant les paramètres de match",
+            name=translate("next_step_label"),
+            value=translate("next_step_value"),
             inline=False
         )
         
@@ -195,4 +192,3 @@ class TournamentView(discord.ui.View):
             view=match_config_view,
             ephemeral=True
         )
-        print("Configuration du tournoi validée, passage à la configuration des matchs")

@@ -1,6 +1,6 @@
 from discord.ui import Select, View, Button, TextInput, Modal
 import discord
-
+from models.lang import translate
 import asyncio
 class WinnerSelectView(View):
     """Vue pour sélectionner le vainqueur (même pattern que les persos)"""
@@ -9,7 +9,7 @@ class WinnerSelectView(View):
         self.parent_view = parent_view
         
         select = Select(
-            placeholder="Qui a gagné le match ?",
+            placeholder=translate("winner_select_placeholder"),
             options=[
                 discord.SelectOption(label=self.parent_view.player1, value="p1"),
                 discord.SelectOption(label=self.parent_view.player2, value="p2")
@@ -23,7 +23,7 @@ class WinnerSelectView(View):
         winner_name = self.parent_view.player1 if self.parent_view.winner == "p1" else self.parent_view.player2
         
         await interaction.response.edit_message(
-            content=f"✅ {winner_name} désigné comme vainqueur",
+            content=translate("winner_selected", name=winner_name),
             view=None
         )
         await self.parent_view.update_main_message()
@@ -63,13 +63,13 @@ class CharacterSelectView(View):
         # Modifier cette partie pour gérer le cas 0 résultat
         if not self.selector.filtered_chars:
             select = Select(
-                placeholder="0 personnage disponible",
-                options=[discord.SelectOption(label="Aucun résultat", value="none", default=True)],
+                placeholder=translate("no_character_available"),
+                options=[discord.SelectOption(label=translate("no_result"), value="none", default=True)],
                 disabled=True  # Désactive la sélection
             )
         else:
             select = Select(
-                placeholder=f"Personnage ({len(self.selector.filtered_chars)} disponibles)",
+                placeholder=translate("character_select_placeholder", count=len(self.selector.filtered_chars)),
                 options=[discord.SelectOption(label=c, value=c) 
                     for c in self.selector.get_current_page()]
             )
@@ -110,7 +110,7 @@ class CharacterSelectView(View):
         
         # Solution corrigée :
         await interaction.response.edit_message(
-                content=f"✅ {selected} sélectionné pour {self.player_name}",
+                content=translate("character_selected", character=selected, name=self.player_name),
                 view=None,
                 embed=None
             )        
@@ -141,8 +141,8 @@ class CharacterSelectView(View):
             view=self
         )
 
-class SearchModal(Modal, title="Recherche de personnage"):
-    search = TextInput(label="Tapez une partie du nom", required=False)
+class SearchModal(Modal, title=translate("search_modal_title")):
+    search = TextInput(label=translate("search_label"), required=False)
 
     def __init__(self, selector):
         super().__init__()
@@ -173,19 +173,19 @@ async def send_match_report(channel, player1, player2, characters):
                 return
             
             embed = discord.Embed(
-                title=f"⚔ {self.player1} vs {self.player2}",
+                title=translate("match_title", p1=self.player1, p2=self.player2),
                 color=0x00ff00 if self.winner else 0xf1c40f
             )
-            
+
             # Personnages
-            embed.add_field(name=self.player1, value=self.p1_char or "❌ Non sélectionné", inline=True)
-            embed.add_field(name=self.player2, value=self.p2_char or "❌ Non sélectionné", inline=True)
-            
+            embed.add_field(name=self.player1, value=self.p1_char or translate("not_selected"), inline=True)
+            embed.add_field(name=self.player2, value=self.p2_char or translate("not_selected"), inline=True)
+
             # Vainqueur
             if self.winner:
                 winner = self.player1 if self.winner == "p1" else self.player2
-                embed.add_field(name="🏆 VAINQUEUR", value=winner, inline=False)
-            
+                embed.add_field(name=translate("winner_label"), value=winner, inline=False)
+
             await self.main_message.edit(embed=embed)
 
         async def show_selector(self, interaction, player_name, is_player1):
@@ -193,7 +193,7 @@ async def send_match_report(channel, player1, player2, characters):
             selector = CharacterSelector(characters)
             view = CharacterSelectView(selector, player_name, is_player1, self)
             await interaction.response.send_message(
-                f"Sélection du personnage pour {player_name}",
+                translate("character_select_for", name=player_name),
                 view=view,
                 ephemeral=False
             )
@@ -202,27 +202,27 @@ async def send_match_report(channel, player1, player2, characters):
             """Affiche le sélecteur de vainqueur"""
             view = WinnerSelectView(self)
             await interaction.response.send_message(
-                "Sélectionnez le gagnant du match :",
+                translate("winner_select_label"),
                 view=view,
                 ephemeral=False
             )
 
-        @discord.ui.button(label=f"Perso {player1}", style=discord.ButtonStyle.green)
+        @discord.ui.button(label=f"Charactere {player1}", style=discord.ButtonStyle.green)
         async def select_p1(self, interaction, button):
             await self.show_selector(interaction, player1, True)
 
-        @discord.ui.button(label=f"Perso {player2}", style=discord.ButtonStyle.red)
+        @discord.ui.button(label=f"Charactere {player2}", style=discord.ButtonStyle.red)
         async def select_p2(self, interaction, button):
             await self.show_selector(interaction, player2, False)
 
-        @discord.ui.button(label="Choisir vainqueur", style=discord.ButtonStyle.blurple)
+        @discord.ui.button(label=translate("select_winner"), style=discord.ButtonStyle.blurple)
         async def select_winner(self, interaction, button):
             await self.show_winner_selector(interaction)
-        @discord.ui.button(label="Valider", style=discord.ButtonStyle.success)
+        @discord.ui.button(label=translate("validate"), style=discord.ButtonStyle.success)
         async def submit(self, interaction, button):
             if None in [self.winner, self.p1_char, self.p2_char]:
                 await interaction.response.send_message(
-                    "Veuillez compléter toutes les sélections",
+                    translate("complete_all_selections"),
                     ephemeral=True
                 )
                 return
@@ -236,7 +236,7 @@ async def send_match_report(channel, player1, player2, characters):
             
             # Confirmation visuelle
             embed = discord.Embed(
-                title="🎉 Résultat enregistré !",
+                title=translate("result_saved_title"),
                 color=0x00ff00
             )
             await interaction.response.send_message(embed=embed)
@@ -250,8 +250,8 @@ async def send_match_report(channel, player1, player2, characters):
     
     # Envoi du message initial
     embed = discord.Embed(
-        title=f"⚔ {player1} vs {player2}",
-        description="Configurez le match:",
+        title=translate("match_title", p1=player1, p2=player2),
+        description=translate("match_configure_desc"),
         color=0x3498db
     )
     view.main_message = await channel.send(embed=embed, view=view)

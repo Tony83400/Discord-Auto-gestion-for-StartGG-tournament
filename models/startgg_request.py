@@ -28,7 +28,7 @@ class StartGG:
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
-            print(f"Erreur API: {e}")
+            print(f"API error: {e}")
             return None
     
     def get_tournament(self, event_slug: str) -> Optional[Dict[str, Any]]:
@@ -130,7 +130,6 @@ class StartGG:
         response = self._make_request(query, variables)
         if response and "data" in response:
             return response["data"]["event"]["phases"]
-        print("Aucun match trouvé pour cette phase.")
         return None
     def get_phase_match_for_round(self,eventId : str ,  phase_id: str, phaseGroupId : str ) -> Optional[Dict[str, Any]]:
         """Récupère les matchs d'une phase spécifique. permet de filtrer par état."""
@@ -152,7 +151,6 @@ class StartGG:
         response = self._make_request(query, variables)
         if response and "data" in response:
             return response["data"]["event"]["phases"][0]['sets']
-        print("Aucun match trouvé pour cette phase.")
         return None
     #Update le score d'un match
     def update_match_score(self, set_id: str, games: list[Dict], winner_id: str) -> Optional[Dict[str, Any]]:

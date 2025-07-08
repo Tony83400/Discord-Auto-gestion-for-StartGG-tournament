@@ -2,29 +2,29 @@ import subprocess
 import sys
 
 def ensure_pip():
-    print("\nVérification de l'installation de pip...")
+    print("\nChecking pip installation...")
     try:
-        # Vérifie si pip est dispo
+        # Check if pip is available
         subprocess.check_call([sys.executable, "-m", "pip", "--version"])
     except subprocess.CalledProcessError:
-        print("pip non trouvé, tentative d'installation avec ensurepip...")
+        print("pip not found, attempting installation with ensurepip...")
         try:
             subprocess.check_call([sys.executable, "-m", "ensurepip", "--upgrade"])
         except subprocess.CalledProcessError:
-            print("Échec de l'installation automatique de pip.")
+            print("Automatic pip installation failed.")
             sys.exit(1)
 
 def install_package(package):
-    print(f"\nInstallation du package {package}...")
+    print(f"\nInstalling package {package}...")
     try:
         subprocess.check_call([sys.executable, "-m", "pip", "install", package])
     except subprocess.CalledProcessError:
-        print(f"Échec de l'installation de {package}.")
+        print(f"Failed to install {package}.")
         sys.exit(1)
 
-# Étapes
+# Steps
 ensure_pip()
 install_package("requests")
 install_package("discord")
 install_package("python-dotenv")
-print("\n\nInstallation terminée avec succès !")  
+print("\n\nInstallation completed successfully!")

@@ -1,9 +1,11 @@
+
 import asyncio
 from typing import Dict, List
 import discord
 from discord.ext import commands
 from models.match import Match
 from models.tournament import Tournament, sggMatch_to_MyMatch
+from models.lang import translate
 
 class MatchManager:
     def __init__(self, bot: commands.Bot, tournament: Tournament):
@@ -19,10 +21,10 @@ class MatchManager:
         try:
             matches = self.tournament.get_matches(state=1)  # Matchs non commencés
             self.pending_matches = matches.copy()
-            await interaction.followup.send(f"🎯 {len(self.pending_matches)} matchs en attente de traitement")
+            await interaction.followup.send(translate("pending_matches_count", count=len(self.pending_matches)))
             return True
         except Exception as e:
-            await interaction.followup.send(f"❌ Erreur lors de la récupération des matchs: {e}")
+            await interaction.followup.send(translate("match_fetch_error", error=e))
             return False
     def reset_all_match(self):
         for id in self.active_matches:
@@ -56,45 +58,39 @@ class MatchManager:
             
             if new_pending_matches and interaction:
                 try:
-                    # Essayer d'utiliser followup d'abord
-                    await interaction.followup.send(f"🔄 {len(new_pending_matches)} nouveaux matchs détectés et ajoutés à la file")
+                    await interaction.followup.send(translate("new_matches_added", count=len(new_pending_matches)))
                 except discord.errors.NotFound:
-                    # Si followup échoue, essayer d'envoyer un nouveau message
                     if hasattr(interaction, 'channel') and interaction.channel:
-                        await interaction.channel.send(f"🔄 {len(new_pending_matches)} nouveaux matchs détectés et ajoutés à la file")
+                        await interaction.channel.send(translate("new_matches_added", count=len(new_pending_matches)))
             
             return len(new_pending_matches)
             
         except Exception as e:
-            print(f"Erreur lors de l'actualisation des matchs: {e}")
+            print(translate("refresh_error_log", error=e))
             if interaction:
                 try:
-                    await interaction.followup.send(f"❌ Erreur lors de l'actualisation: {e}")
+                    await interaction.followup.send(translate("refresh_error", error=e))
                 except discord.errors.NotFound:
                     if hasattr(interaction, 'channel') and interaction.channel:
-                        await interaction.channel.send(f"❌ Erreur lors de l'actualisation: {e}")
+                        await interaction.channel.send(translate("refresh_error", error=e))
             return 0
     
     async def start_match_processing(self, interaction):
         """Démarre le processus automatique de gestion des matchs"""
         if self.is_running:
-            await interaction.followup.send("⚠️ Le gestionnaire de matchs est déjà en cours d'exécution")
+            await interaction.followup.send(translate("match_manager_already_running"))
             return
-            
         if not self.pending_matches:
             if not await self.initialize_matches(interaction):
                 return
-        
         self.is_running = True
-        await interaction.followup.send("🚀 Démarrage du gestionnaire automatique de matchs")
-        
-        # Lancer la boucle principale
+        await interaction.followup.send(translate("match_manager_started"))
         asyncio.create_task(self.match_processing_loop(interaction))
     
     async def stop_match_processing(self, interaction):
         """Arrête le processus automatique"""
         self.is_running = False
-        await interaction.followup.send("⏹️ Arrêt du gestionnaire de matchs demandé")
+        await interaction.followup.send(translate("match_manager_stopped"))
     
     async def match_processing_loop(self, interaction):
         """Boucle principale qui gère l'attribution automatique des matchs"""
@@ -102,29 +98,20 @@ class MatchManager:
         
         while self.is_running and (self.pending_matches or self.active_matches):
             try:
-                # Assigner de nouveaux matchs aux stations libres
                 await self.assign_pending_matches(interaction)
-                
-                # Vérifier les matchs terminés
                 await self.check_completed_matches(interaction)
-                
-                # Actualiser la liste des matchs toutes les 30 secondes (6 cycles de 5 secondes)
                 refresh_counter += 1
                 if refresh_counter >= 6:
                     new_matches_count = await self.refresh_matches_list()
                     if new_matches_count > 0:
-                        print(f"Nouveaux matchs détectés: {new_matches_count}")
+                        print(translate("new_matches_log", count=new_matches_count))
                     refresh_counter = 0
-                
-                # Attendre avant la prochaine vérification
                 await asyncio.sleep(5)
-                
             except Exception as e:
-                print(f"Erreur dans la boucle de traitement: {e}")
+                print(translate("processing_loop_error_log", error=e))
                 await asyncio.sleep(10)
-        
         self.is_running = False
-        await interaction.followup.send("✅ Tous les matchs ont été traités!")
+        await interaction.followup.send(translate("all_matches_processed"))
     
     async def assign_pending_matches(self, interaction):
         """Assigne les matchs en attente aux stations libres"""
@@ -147,60 +134,41 @@ class MatchManager:
                 await self.assign_match_to_station(interaction, match_to_assign, station_num)
                 
         except Exception as e:
-            print(f"Erreur lors de l'assignation: {e}")
+            print(f"Assignation Error: {e}")
     
     async def assign_match_to_station(self, interaction, sgg_match, station_number: int):
         """Assigne un match spécifique à une station"""
         try:
-            # Créer l'objet Match
-            my_match = sggMatch_to_MyMatch(sgg_match, self.tournament)  # BO3 par défaut
-            
-            # Configurer les personnages (tu peux adapter selon tes besoins)
+            my_match = sggMatch_to_MyMatch(sgg_match, self.tournament)
             character_names = [char['name'] for char in self.tournament.characterList]
             my_match.set_characters(self.tournament.characterList)
-            
-            # Assigner à la station
             my_match.set_station(self.get_station_id_by_number(station_number))
             my_match.start_match()
-            
-            # Marquer la station comme utilisée
             for station in self.tournament.station:
                 if station['number'] == station_number:
                     station['isUsed'] = True
                     station['current_match'] = sgg_match
                     break
-            
-            # Créer un canal pour ce match
             channel = await self.create_match_channel(interaction.guild, my_match, station_number)
-            
-            # Stocker les infos du match actif
             self.active_matches[station_number] = {
                 'match_object': my_match,
                 'sgg_match': sgg_match,
                 'channel': channel,
                 'task': None
             }
-            
-            # Lancer le match en arrière-plan
             task = asyncio.create_task(self.run_match(channel, my_match, station_number))
             self.active_matches[station_number]['task'] = task
-            
-            # Notification
             p1_name = sgg_match['slots'][0]['entrant']['name']
             p2_name = sgg_match['slots'][1]['entrant']['name']
-            
-            # Utiliser followup si la réponse initiale a déjà été envoyée, sinon utiliser response
             try:
-                await interaction.followup.send(f"🎮 Match assigné à la station {station_number}: **{p1_name}** vs **{p2_name}**")
+                await interaction.followup.send(translate("match_assigned", station=station_number, p1=p1_name, p2=p2_name))
             except:
-                # Si followup échoue, essayer d'envoyer dans le channel où la commande a été exécutée
-                await interaction.channel.send(f"🎮 Match assigné à la station {station_number}: **{p1_name}** vs **{p2_name}**")
-            
+                await interaction.channel.send(translate("match_assigned", station=station_number, p1=p1_name, p2=p2_name))
         except Exception as e:
             try:
-                await interaction.followup.send(f"❌ Erreur lors de l'assignation du match: {e}")
+                await interaction.followup.send(translate("match_assign_error", error=e))
             except:
-                await interaction.channel.send(f"❌ Erreur lors de l'assignation du match: {e}")
+                await interaction.channel.send(translate("match_assign_error", error=e))
     
     def get_station_id_by_number(self, station_number: int) -> str:
         """Récupère l'ID de la station par son numéro"""
@@ -248,43 +216,34 @@ class MatchManager:
 
             return channel
         except Exception as e:
-            print(f"Erreur lors de la création du canal pour le match: {e}")
+            print(f"Error match channel: {e}")
             return None
 
     async def run_match(self, channel, my_match: Match, station_number: int):
         """Exécute un match complet"""
         try:
             if not channel:
-                print("Pas de canal disponible pour le match")
+                print(translate("no_channel_for_match"))
                 return
-                
             p1_id_sgg = my_match.p1['id']
             p2_id_sgg = my_match.p2['id']
             p1_name = my_match.p1['name']
             p2_name = my_match.p2['name']
-            if p1_id_sgg not in self.tournament.DiscordIdForPlayer :
+            if p1_id_sgg not in self.tournament.DiscordIdForPlayer:
                 p1_id = p1_id_sgg
             else:
                 p1_id = self.tournament.DiscordIdForPlayer[p1_id_sgg]
-                
-            if p2_id_sgg not in self.tournament.DiscordIdForPlayer :
+            if p2_id_sgg not in self.tournament.DiscordIdForPlayer:
                 p2_id = p2_id_sgg
             else:
                 p2_id = self.tournament.DiscordIdForPlayer[p2_id_sgg]
-            await channel.send(f"🎯 **Match démarré** - <@{p1_id}> vs <@{p2_id}> (BO{my_match.bestOf_N})")
-            
-            # Importer ici pour éviter les imports circulaires
+            await channel.send(translate("match_started", p1_id=p1_id, p2_id=p2_id, bo=my_match.bestOf_N))
             from view.match_report import send_match_report
-            
-            # Boucle des games
             for game_num in range(1, my_match.bestOf_N + 1):
                 if my_match.isComplete:
                     break
-                    
-                await channel.send(f"**Game {game_num}** - En attente du report...")
-                
+                await channel.send(translate("game_waiting_report", game=game_num))
                 try:
-                    # Attendre le report avec timeout plus long
                     result = await asyncio.wait_for(
                         send_match_report(
                             channel=channel,
@@ -292,53 +251,40 @@ class MatchManager:
                             player2=p2_name,
                             characters=my_match.charactersName
                         ),
-                        timeout=1800  # 30 minutes
+                        timeout=1800
                     )
-                    
-                    # Traiter le résultat
                     if result["isP1Winner"]:
                         my_match.report_Match(True, result['p1_char'], result['p2_char'])
-                        await channel.send(f"✅ Game {game_num} reportée: **{p1_name}** gagne")
+                        await channel.send(translate("game_reported", game=game_num, winner=p1_name))
                     else:
                         my_match.report_Match(False, result['p1_char'], result['p2_char'])
-                        await channel.send(f"✅ Game {game_num} reportée: **{p2_name}** gagne")
-                    
+                        await channel.send(translate("game_reported", game=game_num, winner=p2_name))
                     if my_match.isComplete:
                         winner_name = p1_name if my_match.p1_score > my_match.p2_score else p2_name
-                        await channel.send(f"🏆 **Match terminé !** Vainqueur: **{winner_name}**")
-                        
-                        # NOUVEAU: Programmer la suppression du channel dans 1 minute
-                        await channel.send("🕐 Ce channel sera supprimé dans 1 minute...")
+                        await channel.send(translate("match_finished", winner=winner_name))
+                        await channel.send(translate("channel_delete_soon"))
                         asyncio.create_task(self.schedule_channel_deletion(channel, station_number))
                         break
-                        
                 except asyncio.TimeoutError:
-                    await channel.send("⌛ Temps écoulé pour ce game - Match en pause")
-                    # Ne pas annuler complètement, laisser la possibilité de reprendre
+                    await channel.send(translate("game_timeout"))
                     return
-                    
         except Exception as e:
-            await channel.send(f"❌ Erreur pendant le match: {e}")
-            print(f"Erreur match: {e}")
+            await channel.send(translate("match_error", error=e))
+            print(translate("match_error_log", error=e))
     
     async def schedule_channel_deletion(self, channel, station_number: int):
         """Programme la suppression du channel après 1 minute"""
         try:
-            # Attendre 1 minute
             await asyncio.sleep(60)
-            
-            # Supprimer le channel
             if channel:
                 await channel.delete()
-                print(f"Channel station-{station_number} supprimé automatiquement")
-                
+                print(translate("channel_deleted_log", station=station_number))
         except discord.NotFound:
-            # Le channel a déjà été supprimé
-            print(f"Channel station-{station_number} déjà supprimé")
+            print(translate("channel_already_deleted_log", station=station_number))
         except discord.Forbidden:
-            print(f"Pas les permissions pour supprimer le channel station-{station_number}")
+            print(translate("channel_delete_permission_error_log", station=station_number))
         except Exception as e:
-            print(f"Erreur lors de la suppression du channel station-{station_number}: {e}")
+            print(translate("channel_delete_error_log", station=station_number, error=e))
     
     async def check_completed_matches(self, interaction):
         """Vérifie et nettoie les matchs terminés"""
@@ -362,71 +308,54 @@ class MatchManager:
             match_info = self.active_matches.get(station_number)
             if not match_info:
                 return
-            
-            # Libérer la station
             for station in self.tournament.station:
                 if station['number'] == station_number:
                     station['isUsed'] = False
                     if 'current_match' in station:
                         del station['current_match']
                     break
-            
-            # Nettoyer la liste des matchs actifs (le channel sera supprimé automatiquement)
             del self.active_matches[station_number]
-            
-            # NOUVEAU: Actualiser la liste des matchs après avoir libéré une station
             await self.refresh_matches_list()
-            
-            # Essayer d'utiliser followup en premier, puis channel si ça échoue
             try:
-                await interaction.followup.send(f"🔄 Station {station_number} libérée")
+                await interaction.followup.send(translate("station_freed", number=station_number))
             except:
-                # Si l'interaction n'est plus valide, utiliser le channel principal
                 if hasattr(interaction, 'channel'):
-                    await interaction.channel.send(f"🔄 Station {station_number} libérée")
-            
+                    await interaction.channel.send(translate("station_freed", number=station_number))
         except Exception as e:
-            print(f"Erreur nettoyage: {e}")
+            print(translate("cleanup_error_log", error=e))
     
     async def get_status(self, interaction):
         """Affiche le statut actuel du gestionnaire"""
         embed = discord.Embed(
-            title="📊 Statut du Gestionnaire de Matchs",
+            title=translate("match_manager_status_title"),
             color=0x00ff00 if self.is_running else 0xff0000
         )
-        
         embed.add_field(
-            name="État", 
-            value="🟢 Actif" if self.is_running else "🔴 Arrêté", 
+            name=translate("status_state_label"),
+            value=translate("status_active") if self.is_running else translate("status_stopped"),
             inline=True
         )
-        
         embed.add_field(
-            name="Matchs en attente", 
-            value=len(self.pending_matches), 
+            name=translate("status_pending_matches_label"),
+            value=len(self.pending_matches),
             inline=True
         )
-        
         embed.add_field(
-            name="Matchs en cours", 
-            value=len(self.active_matches), 
+            name=translate("status_active_matches_label"),
+            value=len(self.active_matches),
             inline=True
         )
-        
-        # Détail des stations
         if self.active_matches:
             stations_info = []
             for station_num, match_info in self.active_matches.items():
                 sgg_match = match_info['sgg_match']
                 p1 = sgg_match['slots'][0]['entrant']['name']
                 p2 = sgg_match['slots'][1]['entrant']['name']
-                stations_info.append(f"Station {station_num}: {p1} vs {p2}")
-            
+                stations_info.append(translate("status_station_info", station=station_num, p1=p1, p2=p2))
             embed.add_field(
-                name="Stations actives",
-                value="\n".join(stations_info) if stations_info else "Aucune",
+                name=translate("status_active_stations_label"),
+                value="\n".join(stations_info) if stations_info else translate("status_none"),
                 inline=False
             )
-        
         await interaction.followup.send(embed=embed)
         

@@ -107,7 +107,6 @@ class Tournament:
             self.selectedPoolId = pool_id
             for pool in self.selectedPhase.get('phaseGroups', [])['nodes']:
                 if int(pool['id']) == int(pool_id):
-                    print(pool)
                     self.selectedPool = pool
                     self._set_player_list()
         else:
@@ -209,7 +208,7 @@ class Tournament:
             'match': None
         }
         self.station.append(new_station)
-        print(f"Station {number} crée avec succès.")
+        print(f"Station {number} created.")
         return new_station
        
     def delete_station(self, number):
@@ -219,25 +218,25 @@ class Tournament:
                     if not s['isUsed']:
                         self.sgg_request.delete_station(s['id'])
                         self.station.remove(s)
-                        print(f"Station {number} supprimée avec succès.")
+                        print(f"Station {number} deleted.")
                         return
                     else:
-                        print(f"Station {number} est deja utilisée et ne peux pas etre supprimée.")
+                        print(f"Station {number} already use and can't be deleted.")
                         return
-            print(f"Station {number} n'éxiste pas.")
+            print(f"Station {number} don't exist.")
             return
         else:
-            print("Pas de station disponible à supprimer.")
+            print("No stations available to delete.")
             return
     def find_station_available(self):
         if self.station:
             for s in self.station:
                 if not s['isUsed']:
                     return s['number']
-            print("Pas de station disponible.")
+            print("No available station found.")
             return None
         else:
-            print("Pas de station disponible.")
+            print("No stations available.")
             return None
     
 
