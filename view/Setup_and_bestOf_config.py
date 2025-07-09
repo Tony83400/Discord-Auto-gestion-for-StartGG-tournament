@@ -275,6 +275,41 @@ class SetupNumberModal(discord.ui.Modal):
                 ephemeral=True
             )
 
+class player_can_check_presence_of_other_player(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(
+                label=translate("all_player_can_check_presence"),
+                value="yes",
+                default=True
+            ),
+            discord.SelectOption(
+                label=translate("no_player_can_check_presence") ,
+                value="no"
+            )
+        ]
+        
+        super().__init__(
+            placeholder="Les joueurs peuvent-ils vérifier la présence de l'autre ?",
+            options=options,
+            custom_id="player_can_check_presence_of_other_player"
+        )
+       
+
+    async def callback(self, interaction: discord.Interaction):
+        selected_value = self.values[0]
+        print(f"Selected value for player presence check: {selected_value}")
+
+        # Stocker la valeur dans la vue
+        self.view.player_can_check_presence = (selected_value == "yes")
+
+        # Mettre à jour les options pour refléter la sélection
+        for option in self.options:
+            option.default = (option.value == str(selected_value))
+
+        await interaction.response.defer(ephemeral=True)
+
+
 class SetupAndBestOfConfig(discord.ui.View):
     def __init__(self, tournament, bot):
         super().__init__(timeout=300)
@@ -286,6 +321,8 @@ class SetupAndBestOfConfig(discord.ui.View):
         self.num_setups = 2
         self.first_setup_number = 1
         self.custom_selectors_visible = False
+        self.player_can_check_presence = True 
+
         
         # Initialize UI components
         self.initialize_components()
@@ -306,6 +343,7 @@ class SetupAndBestOfConfig(discord.ui.View):
         self.winner_selector = RoundBoSelector(self.tournament, "winner")
         self.loser_selector = RoundBoSelector(self.tournament, "loser")
         self.setup_count_selector = SetupCountSelector()
+        self.player_can_check_presence_of_other_player = player_can_check_presence_of_other_player() 
         
         # Setup number button
         self.setup_number_button = discord.ui.Button(
@@ -320,11 +358,12 @@ class SetupAndBestOfConfig(discord.ui.View):
         self.add_item(self.bo_selector)
         self.add_item(self.setup_count_selector)
         self.add_item(self.setup_number_button)
+        self.add_item(self.player_can_check_presence_of_other_player)
 
     def add_validation_button(self):
         """Add the validation button"""
         validate_button = discord.ui.Button(
-            label=translate("launch_tournament_label"),
+            label=translate("finish_config_label"),
             style=discord.ButtonStyle.success,
             custom_id="launch_tournament"
         )
@@ -380,7 +419,10 @@ class SetupAndBestOfConfig(discord.ui.View):
             
             # Créer le gestionnaire de matchs avec la configuration BO
             from models.match_manager import MatchManager
-            match_manager = MatchManager(self.bot, self.tournament)
+            player_can_check_presence_of_other_player = self.player_can_check_presence
+
+            print(f"Player can check presence of other player: {player_can_check_presence_of_other_player}")
+            match_manager = MatchManager(self.bot, self.tournament,player_can_check_presence_of_other_player=player_can_check_presence_of_other_player) #TODO
             match_manager.player_list = self.tournament.DiscordIdForPlayer
             
             # Configurer le BO dans le gestionnaire (à adapter selon votre implémentation)

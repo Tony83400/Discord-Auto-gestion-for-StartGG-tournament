@@ -2,7 +2,7 @@
 from models.lang import translate
 
 class Match:
-    def __init__(self, p1,p2 , matchId , bestOf_N , startGG):
+    def __init__(self, p1,p2 , matchId , bestOf_N , startGG, round):
         self.p1 = p1
         self.p2 = p2
         self.p1_score = 0  # Initialize player 1 score
@@ -17,6 +17,7 @@ class Match:
         self.charactersName = []  # List to store character names, if needed
         self.characters = {}  # Dictionary to store character IDs and names
         self.charactersIDbyName = {}  # Dictionary to store character names by ID, if needed
+        self.round = round
     def set_characters(self, characters):
         # Set the characters for the match
         self.characters = {char['id']: char['name'] for char in characters}

@@ -254,4 +254,5 @@ def sggMatch_to_MyMatch(match, tournament : Tournament):
     p1 = match['slots'][0]['entrant']
     p2 = match['slots'][1]['entrant']
     matchId = match['id']
-    return Match(p1, p2, matchId, bestOf_N, StartGG(sggKey))
+    round = match['fullRoundText']
+    return Match(p1, p2, matchId, bestOf_N, StartGG(sggKey) , round)

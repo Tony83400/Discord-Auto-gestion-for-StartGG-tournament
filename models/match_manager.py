@@ -8,12 +8,13 @@ from models.tournament import Tournament, sggMatch_to_MyMatch
 from models.lang import translate
 
 class MatchManager:
-    def __init__(self, bot: commands.Bot, tournament: Tournament):
+    def __init__(self, bot: commands.Bot, tournament: Tournament , player_can_check_presence_of_other_player: bool = False):
         self.bot = bot
         self.tournament = tournament
         self.active_matches: Dict[int, Dict] = {}  # station_number -> match_info
         self.pending_matches: List[Dict] = []  # Liste des matchs en attente
         self.is_running = False
+        self.player_can_check_presence_of_other_player = player_can_check_presence_of_other_player  # Indique si les joueurs peuvent vérifier la présence de l'autre
         self.player_list = {}  # Dictionnaire pour stocker les joueurs et leurs IDs Discord
         
     async def initialize_matches(self, interaction):
@@ -219,30 +220,58 @@ class MatchManager:
             print(f"Error match channel: {e}")
             return None
 
-    async def run_match(self, channel, my_match: Match, station_number: int):
-        """Exécute un match complet"""
+    async def run_match(self, channel, my_match, station_number):
+        """Exécute un match complet avec vérification de présence"""
         try:
             if not channel:
                 print(translate("no_channel_for_match"))
                 return
+            
+            # Récupérer les informations du match
             p1_id_sgg = my_match.p1['id']
             p2_id_sgg = my_match.p2['id']
             p1_name = my_match.p1['name']
             p2_name = my_match.p2['name']
-            if p1_id_sgg not in self.tournament.DiscordIdForPlayer:
-                p1_id = p1_id_sgg
-            else:
-                p1_id = self.tournament.DiscordIdForPlayer[p1_id_sgg]
-            if p2_id_sgg not in self.tournament.DiscordIdForPlayer:
-                p2_id = p2_id_sgg
-            else:
-                p2_id = self.tournament.DiscordIdForPlayer[p2_id_sgg]
-            await channel.send(translate("match_started", p1_id=p1_id, p2_id=p2_id, bo=my_match.bestOf_N))
+            
+            # Récupérer l'ID du set pour les appels API
+            sgg_match = self.active_matches[station_number]['sgg_match']
+            set_id = sgg_match['id']
+            
+            # Marquer le set comme en attente des joueurs
+            self.tournament.sgg_request.mark_set_as_pending(set_id)
+            
+            # Vérifier la présence des joueurs
+            from view.player_presence import check_player_presence
+            presence_result = await check_player_presence(channel, my_match, self, station_number)
+            
+            if presence_result == 'dq_p1':
+                # Disqualifier le joueur 1, le joueur 2 gagne
+                await channel.send(translate("player_dq_no_show", player=p1_name, winner=p2_name))
+                self.tournament.sgg_request.DQ_player(set_id, p2_id_sgg)
+                await channel.send(translate("channel_delete_soon"))
+                asyncio.create_task(self.schedule_channel_deletion(channel, station_number))
+                return
+                
+            elif presence_result == 'dq_p2':
+                # Disqualifier le joueur 2, le joueur 1 gagne
+                await channel.send(translate("player_dq_no_show", player=p2_name, winner=p1_name))
+                self.tournament.sgg_request.DQ_player(set_id, p1_id_sgg)
+                await channel.send(translate("channel_delete_soon"))
+                asyncio.create_task(self.schedule_channel_deletion(channel, station_number))
+                return
+            
+            self.tournament.sgg_request.startMatch(set_id)
+            
+            
+            # Continuer avec le code existant du match...
             from view.match_report import send_match_report
+            
             for game_num in range(1, my_match.bestOf_N + 1):
                 if my_match.isComplete:
                     break
+                    
                 await channel.send(translate("game_waiting_report", game=game_num))
+                
                 try:
                     result = await asyncio.wait_for(
                         send_match_report(
@@ -253,24 +282,29 @@ class MatchManager:
                         ),
                         timeout=1800
                     )
+                    
                     if result["isP1Winner"]:
                         my_match.report_Match(True, result['p1_char'], result['p2_char'])
                         await channel.send(translate("game_reported", game=game_num, winner=p1_name))
                     else:
                         my_match.report_Match(False, result['p1_char'], result['p2_char'])
                         await channel.send(translate("game_reported", game=game_num, winner=p2_name))
+                    
                     if my_match.isComplete:
                         winner_name = p1_name if my_match.p1_score > my_match.p2_score else p2_name
                         await channel.send(translate("match_finished", winner=winner_name))
                         await channel.send(translate("channel_delete_soon"))
                         asyncio.create_task(self.schedule_channel_deletion(channel, station_number))
                         break
+                        
                 except asyncio.TimeoutError:
                     await channel.send(translate("game_timeout"))
                     return
+                    
         except Exception as e:
             await channel.send(translate("match_error", error=e))
             print(translate("match_error_log", error=e))
+
     
     async def schedule_channel_deletion(self, channel, station_number: int):
         """Programme la suppression du channel après 1 minute"""

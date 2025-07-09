@@ -107,6 +107,7 @@ class StartGG:
                     id
                     identifier
                     round
+                    fullRoundText
                     slots {
                         entrant {
                             name
@@ -332,6 +333,38 @@ class StartGG:
         """
         variables = {"setId": set_id}
         response = self._make_request(query, variables)
+        if response and "data" in response:
+            return True
+        return False
+    
+    def mark_set_as_pending(self, set_id: str) -> Optional[Dict[str, Any]]:
+        """Marque un set comme en attente."""
+        query = """
+        mutation MarkSetAsPending($setId: ID!) {
+            markSetCalled(setId: $setId) {
+                id
+            }
+        }
+        """
+        variables = {"setId": set_id}
+        response = self._make_request(query, variables)
+        print(response)
+        if response and "data" in response:
+            return True
+        return False
+    
+    def DQ_player(self, set_id: str , winner_id: str):
+        """Disqualifie un joueur d'un set."""
+        query = """
+        mutation DisqualifyPlayer($setId: ID!, $winnerId: ID!) {
+            reportBracketSet(isDQ: true , setId: $setId, winnerId: $winnerId) {
+                id
+            }
+        }
+        """
+        variables = {"setId": set_id, "winnerId": winner_id}
+        response = self._make_request(query, variables)
+        print(response)
         if response and "data" in response:
             return True
         return False
