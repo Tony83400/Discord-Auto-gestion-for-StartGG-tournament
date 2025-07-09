@@ -4,6 +4,8 @@ https://developer.start.gg/docs/authentication/
 
 Créez un token API start.gg
 
+Renommer le fichier "exemple.env" en ".env"
+
 Dans le fichier .env, remplacez la valeur de START_GG_KEY par votre token
 
 

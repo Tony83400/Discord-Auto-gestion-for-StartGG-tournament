@@ -1,6 +1,7 @@
 Create a startgg api Token
 https://developer.start.gg/docs/authentication/
 
+rename the "exemple.env" file in ".env" 
 Replace the value of "START_GG_KEY" in .env by your token
 
 Create your discord bot :
