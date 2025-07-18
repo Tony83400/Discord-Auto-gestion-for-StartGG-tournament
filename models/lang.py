@@ -51,6 +51,8 @@ translations = {
         "result_saved_title": "🎉 Résultat enregistré !",
         "match_configure_desc": "Configurez le match:",
         "match_format_label": "⚔️ Format de match",
+        "delete_stations_description": "supprimer toutes les stations",
+        "delete_stations_done": "✅ {num_station} stations supprimées",
         "bo_format_value": "Bo{bo}",
         "bo_format_custom": "Bo3/BO5",
         "setups_label": "🖥️ Setups",
@@ -95,7 +97,7 @@ translations = {
         "no_tournament": "❌ Aucun tournoi configuré.",
         "wrong_guild": "❌ Le tournoi actuel est sur un autre serveur.",
         "no_manager": "❌ Aucun gestionnaire actif.",
-        "full_stop_done": "✅ **Arrêt complet terminé :**\n• Gestionnaire de matchs arrêté\n• {channels} channels supprimés\n• {stations} stations supprimées\n• Toutes les listes nettoyées",
+        "full_stop_done": "✅ **Arrêt complet terminé :**\n• Gestionnaire de matchs arrêté\n• {channels} channels supprimés\n• Toutes les listes nettoyées",
         "delete_channel_error": "Erreur lors de la suppression du channel {name}: {error}",
         "delete_permission_denied": "Permission refusée pour supprimer le channel {name}.",
         "station_freed": "🔧 Station {number} forcée à être libre",
@@ -279,7 +281,9 @@ translations = {
         "no_tournament": "❌ No tournament configured.",
         "wrong_guild": "❌ The current tournament is on another server.",
         "no_manager": "❌ No active manager.",
-        "full_stop_done": "✅ **Complete stop finished:**\n• Match manager stopped\n• {channels} channels deleted\n• {stations} stations deleted\n• All lists cleared",
+        "full_stop_done": "✅ **Complete stop finished:**\n• Match manager stopped\n• {channels} channels deleted\n• All lists cleared",
+        "delete_stations_description": "delete all stations",
+        "delete_stations_done": "✅ {num_station} stations deleted",
         "delete_channel_error": "Error deleting channel {name}: {error}",
         "delete_permission_denied": "Permission denied to delete channel {name}.",
         "station_freed": "🔧 Station {number} forcibly freed",
@@ -362,6 +366,8 @@ translations = {
 
 
 current_lang = os.getenv("LANG")  # Default to English if not set
+if current_lang not in translations:
+    current_lang = "en"  # Fallback to English if the specified language is not available
 print(f"Current language set to: {current_lang}")
 
 # 3. Fonction de traduction

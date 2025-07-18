@@ -153,13 +153,6 @@ async def stop_matches(interaction: discord.Interaction):
         except discord.HTTPException:
             pass
     
-    num_stations = 0
-    if bot.current_tournament:
-        for station in bot.current_tournament.station:
-            station['isUsed'] = False
-            bot.current_tournament.sgg_request.delete_station(station['id'])
-            num_stations += 1
-    
     bot.match_manager.reset_all_match()
     if bot.current_tournament:
         bot.current_tournament.station.clear()
@@ -169,10 +162,23 @@ async def stop_matches(interaction: discord.Interaction):
     await interaction.followup.send(
         translate(
             "full_stop_done",
-            channels=deleted_channels,
-            stations=num_stations
+            channels=deleted_channels
         )
     )
+print(translate("delete_stations_description"))
+@bot.tree.command(name="delete_all_stations", description=translate("delete_stations_description"))
+@has_role("Tournament Admin")
+async def delete_all_stations(interaction: discord.Interaction):
+    num_stations = 0
+    if bot.current_tournament:
+        for station in bot.current_tournament.station:
+            station['isUsed'] = False
+            bot.current_tournament.sgg_request.delete_station(station['id'])
+            num_stations += 1
+    await interaction.response.send_message(
+        translate("delete_stations_done", num_station=num_stations),
+    )
+    
 
 @bot.tree.command(name="match_status", description=translate("match_status_description"))
 async def match_status(interaction: discord.Interaction):
