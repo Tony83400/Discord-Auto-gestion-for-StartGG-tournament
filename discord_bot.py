@@ -165,7 +165,6 @@ async def stop_matches(interaction: discord.Interaction):
             channels=deleted_channels
         )
     )
-print(translate("delete_stations_description"))
 @bot.tree.command(name="delete_all_stations", description=translate("delete_stations_description"))
 @has_role("Tournament Admin")
 async def delete_all_stations(interaction: discord.Interaction):

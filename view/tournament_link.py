@@ -49,10 +49,13 @@ class TournamentModal(discord.ui.Modal):
         # Créer l'objet tournament
         tournament = Tournament(tournament_slug)
         if len(link_parts) >= 7:
+            print("Event Name", link_parts[6].strip())
             tournament.select_event_by_name(link_parts[6].strip())
         if len(link_parts) >= 9:
+            print("Phase id",link_parts[8].strip())
             tournament.select_event_phase(link_parts[8].strip())
         if len(link_parts) >= 10:
+            print("Pool id",link_parts[9].strip())
             tournament.select_pool(link_parts[9].strip())
         # Vérifications
         if tournament.id is None:

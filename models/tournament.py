@@ -94,6 +94,12 @@ class Tournament:
             raise ValueError("No event selected. Please select an event first.")
     
     def select_event_phase(self, phase_id: int):
+        if phase_id is not int:
+            if phase_id.isdigit():
+                phase_id = int(phase_id)
+            else:
+                return
+            
         if self.selectedEvent:
             self.selectedPhaseId = phase_id
             for phase in self.selectedEvent['phases']:
@@ -103,6 +109,13 @@ class Tournament:
         else:
             raise ValueError("No event selected. Please select an event first.")
     def select_pool(self, pool_id: int):
+        if pool_id is not int:
+            if pool_id.isdigit():
+                pool_id = int(pool_id)
+            else:
+                return
+        if self.selectedPhase is None:
+            return
         if self.selectedEvent:
             self.selectedPoolId = pool_id
             for pool in self.selectedPhase.get('phaseGroups', [])['nodes']:
@@ -195,11 +208,11 @@ class Tournament:
         else :
             for s in self.station:
                 if s['number'] == number:
-                    print(f"La station {number} existe deja.")
+                    print(f"Station {number} already exists.")
                     return
         id = self.sgg_request.create_station(self.id, number)
         if id is None:
-            print(f"La station {number} existe deja.")
+            print(f"Failed to create station {number}.")
             return
         new_station = {
             'number': number,

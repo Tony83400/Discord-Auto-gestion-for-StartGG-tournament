@@ -1,5 +1,3 @@
-
-
 import discord
 from models.lang import translate
 from models.tournament import Tournament
@@ -51,23 +49,16 @@ class BoSelector(discord.ui.Select):
             option.default = (option.value == selected_value)
         
         if selected_value == "custom":
-            # Mode custom - afficher les sélecteurs pour winner/loser
-            self.view.show_custom_selectors()
-            
-            await interaction.response.edit_message(view=self.view)
-        
+            # Mode custom - créer une nouvelle vue pour la configuration custom
+            await self.view.show_custom_config(interaction)
         else:
             # Mode simple BO3 ou BO5 pour tous les matchs
-            self.view.hide_custom_selectors()
-            
-            # Sauvegarde du format dans le tournoi
             self.tournament.default_bo = int(selected_value)
             self.tournament.bo_custom = False
             self.tournament.round_where_bo5_start_winner = None
             self.tournament.round_where_bo5_start_loser = None
             
             await interaction.response.edit_message(view=self.view)
-      
 
 
 class RoundBoSelector(discord.ui.Select):
@@ -142,7 +133,6 @@ class RoundBoSelector(discord.ui.Select):
                              (option.value != "0" and int(option.value) == selected_round))
         
         await interaction.response.edit_message(view=self.view)
-        
 
 
 class SetupCountSelector(discord.ui.Select):
@@ -182,6 +172,7 @@ class SetupCountSelector(discord.ui.Select):
             
             await interaction.response.defer(ephemeral=True)
 
+
 class CustomSetupCountModal(discord.ui.Modal):
     def __init__(self, match_config_view):
         super().__init__(title="Nombre de setups personnalisé")
@@ -215,18 +206,10 @@ class CustomSetupCountModal(discord.ui.Modal):
             
             self.match_config_view.num_setups = new_count
             
-            # Créer une nouvelle vue pour mettre à jour l'affichage
-            new_view = SetupAndBestOfConfig(
-                self.match_config_view.tournament,
-                self.match_config_view.bot
-            )
-            new_view.selected_bo = self.match_config_view.selected_bo
-            new_view.num_setups = self.match_config_view.num_setups
-            new_view.first_setup_number = self.match_config_view.first_setup_number
-            
-            await interaction.response.edit_message(view=new_view)
+            # Mettre à jour la vue actuelle au lieu d'en créer une nouvelle
+            self.match_config_view.update_setup_count_selector()
+            await interaction.response.edit_message(view=self.match_config_view)
           
-            
         except ValueError:
             await interaction.response.send_message(
                 "❌ Veuillez entrer un nombre valide.",
@@ -238,7 +221,6 @@ class SetupNumberModal(discord.ui.Modal):
     def __init__(self, match_config_view):
         super().__init__(title=translate("setup_number_config_title"))
         self.match_config_view = match_config_view
-        
         
         label = translate("Setup_numbers")
         self.setup_number_input = discord.ui.TextInput(
@@ -267,15 +249,14 @@ class SetupNumberModal(discord.ui.Modal):
             # Mettre à jour le message existant
             await interaction.response.edit_message(view=self.match_config_view)
             
-       
-            
         except ValueError:
             await interaction.response.send_message(
                 translate("setup_number_invalid"),
                 ephemeral=True
             )
 
-class player_can_check_presence_of_other_player(discord.ui.Select):
+
+class PlayerCanCheckPresenceSelector(discord.ui.Select):
     def __init__(self):
         options = [
             discord.SelectOption(
@@ -284,7 +265,7 @@ class player_can_check_presence_of_other_player(discord.ui.Select):
                 default=True
             ),
             discord.SelectOption(
-                label=translate("no_player_can_check_presence") ,
+                label=translate("no_player_can_check_presence"),
                 value="no"
             )
         ]
@@ -294,7 +275,6 @@ class player_can_check_presence_of_other_player(discord.ui.Select):
             options=options,
             custom_id="player_can_check_presence_of_other_player"
         )
-       
 
     async def callback(self, interaction: discord.Interaction):
         selected_value = self.values[0]
@@ -310,6 +290,55 @@ class player_can_check_presence_of_other_player(discord.ui.Select):
         await interaction.response.defer(ephemeral=True)
 
 
+# Vue séparée pour la configuration custom des BOs
+class CustomBoConfigView(discord.ui.View):
+    def __init__(self, main_view, tournament):
+        super().__init__(timeout=300)
+        self.main_view = main_view
+        self.tournament = tournament
+        
+        # Ajouter les sélecteurs pour winner et loser bracket
+        self.add_item(RoundBoSelector(tournament, "winner"))
+        self.add_item(RoundBoSelector(tournament, "loser"))
+        
+        # Bouton pour revenir à la configuration principale
+        back_button = discord.ui.Button(
+            label="⬅️ Retour à la configuration",
+            style=discord.ButtonStyle.secondary,
+            custom_id="back_to_main"
+        )
+        back_button.callback = self.back_to_main
+        self.add_item(back_button)
+        
+        # Bouton de validation
+        validate_button = discord.ui.Button(
+            label="✅ Valider la configuration custom",
+            style=discord.ButtonStyle.success,
+            custom_id="validate_custom"
+        )
+        validate_button.callback = self.validate_custom
+        self.add_item(validate_button)
+
+    async def back_to_main(self, interaction: discord.Interaction):
+        """Retour à la vue principale"""
+        # Réinitialiser le sélecteur BO à une valeur non-custom
+        self.main_view.selected_bo = "3"
+        self.main_view.update_bo_selector_default()
+        
+        # Réinitialiser la configuration du tournoi
+        self.tournament.bo_custom = False
+        self.tournament.default_bo = 3
+        self.tournament.round_where_bo5_start_winner = None
+        self.tournament.round_where_bo5_start_loser = None
+        
+        await interaction.response.edit_message(view=self.main_view)
+
+    async def validate_custom(self, interaction: discord.Interaction):
+        """Valide la configuration custom et retourne à la vue principale"""
+        self.main_view.selected_bo = "custom"
+        await interaction.response.edit_message(view=self.main_view)
+
+
 class SetupAndBestOfConfig(discord.ui.View):
     def __init__(self, tournament, bot):
         super().__init__(timeout=300)
@@ -320,19 +349,13 @@ class SetupAndBestOfConfig(discord.ui.View):
         self.selected_bo = "3"
         self.num_setups = 2
         self.first_setup_number = 1
-        self.custom_selectors_visible = False
         self.player_can_check_presence = True 
 
-        
         # Initialize UI components
         self.initialize_components()
         
         # Add default components
         self.add_default_components()
-        
-        # Add custom selectors if needed
-        if getattr(tournament, 'bo_custom', False):
-            self.show_custom_selectors()
         
         # Add validation button
         self.add_validation_button()
@@ -340,10 +363,8 @@ class SetupAndBestOfConfig(discord.ui.View):
     def initialize_components(self):
         """Initialize all UI components"""
         self.bo_selector = BoSelector(self.tournament)
-        self.winner_selector = RoundBoSelector(self.tournament, "winner")
-        self.loser_selector = RoundBoSelector(self.tournament, "loser")
         self.setup_count_selector = SetupCountSelector()
-        self.player_can_check_presence_of_other_player = player_can_check_presence_of_other_player() 
+        self.player_can_check_presence_selector = PlayerCanCheckPresenceSelector() 
         
         # Setup number button
         self.setup_number_button = discord.ui.Button(
@@ -358,7 +379,7 @@ class SetupAndBestOfConfig(discord.ui.View):
         self.add_item(self.bo_selector)
         self.add_item(self.setup_count_selector)
         self.add_item(self.setup_number_button)
-        self.add_item(self.player_can_check_presence_of_other_player)
+        self.add_item(self.player_can_check_presence_selector)
 
     def add_validation_button(self):
         """Add the validation button"""
@@ -370,26 +391,40 @@ class SetupAndBestOfConfig(discord.ui.View):
         validate_button.callback = self.launch_tournament
         self.add_item(validate_button)
 
+    async def show_custom_config(self, interaction: discord.Interaction):
+        """Affiche la vue de configuration custom dans un nouveau message"""
+        custom_view = CustomBoConfigView(self, self.tournament)
+        
+        embed = discord.Embed(
+            title="🔧 Configuration Best-Of personnalisée",
+            description="Configurez les rounds où les matchs passent en BO5 pour chaque bracket.",
+            color=0x3498db
+        )
+        embed.add_field(
+            name="Winner Bracket", 
+            value="Sélectionnez le round où les matchs passent en BO5", 
+            inline=False
+        )
+        embed.add_field(
+            name="Loser Bracket", 
+            value="Sélectionnez le round où les matchs passent en BO5", 
+            inline=False
+        )
+        
+        await interaction.response.edit_message(embed=embed, view=custom_view)
 
-    def show_custom_selectors(self):
-        """Affiche les sélecteurs pour la configuration par round"""
-        if not self.custom_selectors_visible:
-            # Ajouter les sélecteurs après le BO selector
-            self.add_item(self.winner_selector)
-            self.add_item(self.loser_selector)
-            self.custom_selectors_visible = True
-    
-    def hide_custom_selectors(self):
-        """Cache les sélecteurs pour la configuration par round"""
-        if self.custom_selectors_visible:
-            # Supprimer les sélecteurs custom
-            try:
-                self.remove_item(self.winner_selector)
-                self.remove_item(self.loser_selector)
-                self.custom_selectors_visible = False
-            except ValueError:
-                # Les items ne sont pas dans la vue
-                pass
+    def update_bo_selector_default(self):
+        """Met à jour la sélection par défaut du sélecteur BO"""
+        for option in self.bo_selector.options:
+            option.default = (option.value == self.selected_bo)
+
+    def update_setup_count_selector(self):
+        """Met à jour la sélection par défaut du sélecteur de nombre de setups"""
+        for option in self.setup_count_selector.options:
+            if option.value != "custom":
+                option.default = (int(option.value) == self.num_setups)
+            else:
+                option.default = False
 
     async def configure_setup_number(self, interaction: discord.Interaction):
         """Ouvre un modal pour configurer le numéro du premier setup"""
@@ -398,10 +433,7 @@ class SetupAndBestOfConfig(discord.ui.View):
 
     def update_setup_button_label(self):
         """Met à jour le label du bouton de configuration du setup"""
-        for item in self.children:
-            if isinstance(item, discord.ui.Button) and item.custom_id == "setup_number_config":
-                item.label = translate("setup_number_config_label", first_setup_number=self.first_setup_number)
-                break
+        self.setup_number_button.label = translate("setup_number_config_label", first_setup_number=self.first_setup_number)
                 
     async def launch_tournament(self, interaction: discord.Interaction):
         """Lance le tournoi avec la configuration choisie"""
@@ -421,16 +453,12 @@ class SetupAndBestOfConfig(discord.ui.View):
             from models.match_manager import MatchManager
             player_can_check_presence_of_other_player = self.player_can_check_presence
 
-            print(f"Player can check presence of other player: {player_can_check_presence_of_other_player}")
-            match_manager = MatchManager(self.bot, self.tournament,player_can_check_presence_of_other_player=player_can_check_presence_of_other_player) #TODO
+            match_manager = MatchManager(self.bot, self.tournament, player_can_check_presence_of_other_player=player_can_check_presence_of_other_player)
             match_manager.player_list = self.tournament.DiscordIdForPlayer
             
-            # Configurer le BO dans le gestionnaire (à adapter selon votre implémentation)
-            if hasattr(match_manager, 'bo_format'):
-                if self.selected_bo != "custom":
-                    self.tournament.set_best_of(int(self.selected_bo))
-
-                
+            # Configurer le BO dans le gestionnaire
+            if self.selected_bo != "custom":
+                self.tournament.set_best_of(int(self.selected_bo))
             
             # Assigner aux variables globales du bot
             if hasattr(self.bot, 'current_tournament'):
@@ -439,17 +467,42 @@ class SetupAndBestOfConfig(discord.ui.View):
                 self.bot.match_manager = match_manager
             
             # Créer l'embed de confirmation
-
             embed = discord.Embed(
                 title=translate("tournament_config_success"),
                 color=0x00ff00
             )
 
-            embed.add_field(
-                name=translate("match_format_label"),
-                value=translate("bo_format_value", bo=self.selected_bo) if self.selected_bo != "custom" else translate("bo_format_custom"),
-                inline=True
-            )
+            # Configuration du format de match
+            if self.selected_bo != "custom":
+                embed.add_field(
+                    name=translate("match_format_label"),
+                    value=translate("bo_format_value", bo=self.selected_bo),
+                    inline=True
+                )
+            else:
+                # Format custom - afficher les détails des rounds BO5
+                custom_format_text = translate("bo_format_custom")
+                
+                # Ajouter les informations sur le winner bracket
+                if self.tournament.round_where_bo5_start_winner is not None:
+                    winner_round_text = translate("winner_bracket_bo5_from", round=self.tournament.round_where_bo5_start_winner)
+                else:
+                    winner_round_text = translate("winner_bracket_always_bo3")
+                
+                # Ajouter les informations sur le loser bracket
+                if self.tournament.round_where_bo5_start_loser is not None:
+                    # Utilise la valeur absolue car les rounds loser sont négatifs
+                    loser_round_text = translate("loser_bracket_bo5_from", round=abs(self.tournament.round_where_bo5_start_loser))
+                else:
+                    loser_round_text = translate("loser_bracket_always_bo3")
+                
+                custom_format_details = f"{custom_format_text}\n{winner_round_text}\n{loser_round_text}"
+                
+                embed.add_field(
+                    name=translate("match_format_label"),
+                    value=custom_format_details,
+                    inline=True
+                )
 
             embed.add_field(
                 name=translate("setups_label"),
