@@ -348,7 +348,6 @@ class StartGG:
         """
         variables = {"setId": set_id}
         response = self._make_request(query, variables)
-        print(response)
         if response and "data" in response:
             return True
         return False
@@ -364,7 +363,6 @@ class StartGG:
         """
         variables = {"setId": set_id, "winnerId": winner_id}
         response = self._make_request(query, variables)
-        print(response)
         if response and "data" in response:
             return True
         return False

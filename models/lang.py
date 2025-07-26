@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 import os
 
 translations = {
@@ -371,8 +372,9 @@ translations = {
     }
 }
 
-
+load_dotenv()
 current_lang = os.getenv("LANG")  # Default to English if not set
+print(f"Detected language from environment: {current_lang}")
 if current_lang not in translations:
     current_lang = "en"  # Fallback to English if the specified language is not available
 print(f"Current language set to: {current_lang}")

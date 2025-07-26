@@ -154,8 +154,6 @@ async def stop_matches(interaction: discord.Interaction):
             pass
     
     bot.match_manager.reset_all_match()
-    if bot.current_tournament:
-        bot.current_tournament.station.clear()
     bot.match_manager.active_matches.clear()
     bot.match_manager.pending_matches.clear()
 
