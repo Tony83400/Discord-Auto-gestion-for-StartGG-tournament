@@ -1,15 +1,13 @@
 from models.startgg_request import StartGG
 from models.match import Match
 from dotenv import load_dotenv
-import os
 
-load_dotenv()  # Charge le fichier .env
 
-sggKey = os.getenv('START_GG_KEY')
+
 class Tournament:
     def __init__(self, slug):
         self.slug = slug
-        self.sgg_request = StartGG(sggKey)
+        self.sgg_request = StartGG()
         self.events = None
         self.selectedEvent = None
         self.name= None
@@ -268,4 +266,4 @@ def sggMatch_to_MyMatch(match, tournament : Tournament):
     p2 = match['slots'][1]['entrant']
     matchId = match['id']
     round = match['fullRoundText']
-    return Match(p1, p2, matchId, bestOf_N, StartGG(sggKey) , round)
+    return Match(p1, p2, matchId, bestOf_N, tournament.sgg_request , round)

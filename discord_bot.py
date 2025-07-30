@@ -12,7 +12,6 @@ from models.lang import translate
 load_dotenv()  # Charge le fichier .env
 
 token = os.getenv('DISCORD_BOT_TOKEN')
-sggKey = os.getenv('START_GG_KEY')
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -112,13 +111,14 @@ async def start_matches(interaction: discord.Interaction):
             ephemeral=True
         )
         return
+    
     await interaction.response.defer()
     await bot.match_manager.start_match_processing(interaction)
 
 @bot.tree.command(name="stop_matches", description=translate("stop_matches_description"))
 @has_role("Tournament Admin")
 async def stop_matches(interaction: discord.Interaction):
-    
+
     if not bot.match_manager:
         await interaction.response.send_message(translate("no_manager"))
         return
@@ -156,7 +156,6 @@ async def stop_matches(interaction: discord.Interaction):
     bot.match_manager.reset_all_match()
     bot.match_manager.active_matches.clear()
     bot.match_manager.pending_matches.clear()
-
     await interaction.followup.send(
         translate(
             "full_stop_done",
@@ -303,4 +302,29 @@ async def force_refresh(interaction: discord.Interaction):
     await interaction.response.defer()  # Important pour éviter l'expiration trop rapide
     await bot.match_manager.refresh_matches_list(interaction)
     await interaction.followup.send(translate("refresh_done"))
+
+@bot.tree.command(name="key_info", description="Sgg key information")
+@has_role("Tournament Admin")
+async def key_info(interaction: discord.Interaction):
+    if not bot.current_tournament:
+        await interaction.response.send_message(translate("no_tournament"))
+        return
+    global current_tournament_guild_id
+
+    if current_tournament_guild_id != interaction.guild.id:
+        await interaction.response.send_message(
+            translate("wrong_guild"),
+            ephemeral=True
+        )
+        return
+    
+    await interaction.response.defer()
+    rate_status = bot.current_tournament.sgg_request.get_rate_limit_status()
+    embed = discord.Embed(title=translate("key_info_title"), color=0x3498db)
+    
+    for key, status in rate_status.items():
+        embed.add_field(name=f"Key: {key}", value=status, inline=False)
+    
+    await interaction.followup.send(embed=embed)
+
 bot.run(token)

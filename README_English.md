@@ -14,6 +14,8 @@ Click on "Reset Token"
 Now you can copy your token DON'T SHARE IT
 
 in the .env file replace the "DISCORD_BOT_TOKEN" by your token
+If you have multiple keys, follow the pattern STARTGG_API_KEY_1 STARTGG_API_KEY_2 STARTGG_API_KEY_3 etc.
+Delete any empty keys, do not leave STARTGG_API_KEY_3 = ""
 
 Go back to the discord website, in the same page scroll down and find the "Privileged Gateway Intents"
 Check the "Server Members intent" and the "Message contente intent"

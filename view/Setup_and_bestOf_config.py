@@ -544,7 +544,6 @@ class SetupAndBestOfConfig(discord.ui.View):
                 embed=embed,
                 ephemeral=True
             )
-
             print(translate("tournament_config_log", bo=self.selected_bo, count=self.num_setups, first=self.first_setup_number, last=self.first_setup_number + self.num_setups - 1))
             
         except Exception as e:

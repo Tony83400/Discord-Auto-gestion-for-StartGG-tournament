@@ -7,6 +7,8 @@ Créez un token API start.gg
 Renommer le fichier "exemple.env" en ".env"
 
 Dans le fichier .env, remplacez la valeur de START_GG_KEY par votre token
+Si vous avez plusieurs key suivez le schéma STARTGG_API_KEY_1 STARTGG_API_KEY_2 STARTGG_API_KEY_3 etc ...
+Supprimer toute clée vide, ne laissez pas STARTGG_API_KEY_3 = ""
 
 
 Créer votre bot Discord

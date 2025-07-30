@@ -63,7 +63,6 @@ class MatchManager:
                 except discord.errors.NotFound:
                     if hasattr(interaction, 'channel') and interaction.channel:
                         await interaction.channel.send(translate("new_matches_added", count=len(new_pending_matches)))
-            
             return len(new_pending_matches)
             
         except Exception as e:
