@@ -7,7 +7,7 @@ from view.Setup_and_bestOf_config import SetupAndBestOfConfig
 
 
 class EventSelector(discord.ui.Select):
-    def __init__(self, tournament: Tournament):
+    def __init__(self, tournament: Tournament , pool_number: int):
         # Créer les options avec gestion des valeurs par défaut
         options = []
         for i, event in enumerate(tournament.events):
@@ -22,6 +22,7 @@ class EventSelector(discord.ui.Select):
             options=options
         )
         self.tournament = tournament
+        self.pool_number = pool_number
 
     async def callback(self, interaction: discord.Interaction):
         selected_event_id = self.values[0]
@@ -37,7 +38,7 @@ class EventSelector(discord.ui.Select):
             self.tournament.selectedPool = None
         
         # Créer une nouvelle vue avec les données mises à jour
-        new_view = TournamentView(self.tournament, self.view.bot)  # Passer le bot
+        new_view = TournamentView(tournament=self.tournament, bot=self.view.bot , pool_number=self.pool_number)  # Passer le bot
         
         await interaction.response.edit_message(
             content=translate("event_selected", name=selected_event['name']),
@@ -46,9 +47,9 @@ class EventSelector(discord.ui.Select):
 
 
 class PhaseSelector(discord.ui.Select):
-    def __init__(self, tournament: Tournament):
+    def __init__(self, tournament: Tournament , pool_number: int):
         self.tournament = tournament
-        
+        self.pool_number = pool_number
         if not tournament.selectedEvent :
             print(translate("no_phase_available"))
             options = [discord.SelectOption(label=translate("no_phase_available"), value="none")]
@@ -77,17 +78,16 @@ class PhaseSelector(discord.ui.Select):
         selected_phase_id = self.values[0]
         self.tournament.select_event_phase(selected_phase_id)        
             
-        new_view = TournamentView(self.tournament, self.view.bot)  # Passer le bot
+        new_view = TournamentView(tournament= self.tournament,bot= self.view.bot , pool_number= self.pool_number)  # Passer le bot
         await interaction.response.edit_message(
             view=new_view
         )
 
 
 class PoolSelector(discord.ui.Select):
-    def __init__(self, tournament: Tournament):
+    def __init__(self, tournament: Tournament ):
         self.tournament = tournament
         selectedPhase = self.tournament.selectedPhase
-       
         options = []
         if selectedPhase is None:
             print(translate("no_pool_available"))
@@ -130,15 +130,16 @@ class PoolSelector(discord.ui.Select):
 
 
 class TournamentView(discord.ui.View):
-    def __init__(self, tournament: Tournament, bot=None):
+    def __init__(self, tournament: Tournament,pool_number : int, bot=None):
         super().__init__(timeout=300)  # 5 minutes de timeout
         self.tournament = tournament
+        self.pool_number = pool_number
         self.bot = bot  # Stocker la référence du bot
 
         # Ajouter les sélecteurs
-        self.add_item(EventSelector(tournament))
-        self.add_item(PhaseSelector(tournament))
-        self.add_item(PoolSelector(tournament))
+        self.add_item(EventSelector(tournament , pool_number))
+        self.add_item(PhaseSelector(tournament , pool_number))
+        self.add_item(PoolSelector(tournament ))
 
         # Bouton de validation
         validate_button = discord.ui.Button(
@@ -185,10 +186,11 @@ class TournamentView(discord.ui.View):
         )
         
         # Créer la vue de configuration des matchs
-        match_config_view = SetupAndBestOfConfig(tournament, self.bot)
+        match_config_view = SetupAndBestOfConfig(tournament, self.bot, pool_number=self.pool_number)
         
         await interaction.response.send_message(
             embed=embed,
             view=match_config_view,
             ephemeral=True
         )
+        

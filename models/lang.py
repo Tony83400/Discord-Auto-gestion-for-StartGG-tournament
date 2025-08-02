@@ -185,6 +185,9 @@ translations = {
         "search_modal_title": "Recherche de personnage",
         "select_winner": "Sélectionner le vainqueur",
         "validate": "Valider",
+        "select_number_of_tournaments": "Sélectionnez le nombre de tournois à configurer",
+        "select_number_of_tournaments_prompt": "Combien de tournois souhaitez-vous configurer ?",
+        "number_of_tournaments": "Nombre de tournois",
     },
     "en": {
         "station_assigned_log": "Station: {station} assigned to match: {match}",
@@ -369,6 +372,9 @@ translations = {
         "search_modal_title": "Search Character",
         "select_winner": "Select Winner",
         "validate": "Validate",
+        "select_number_of_tournaments": "Select the number of tournaments to configure",
+        "select_number_of_tournaments_prompt": "How many tournaments do you want to configure?",
+        "number_of_tournaments": "Number of tournaments",
     }
 }
 

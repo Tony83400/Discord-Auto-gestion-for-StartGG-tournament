@@ -22,7 +22,7 @@ class Tournament:
         self.rounds = None
         self.id = None
         self.numAttendees = 0
-        self.characterList = self.sgg_request.get_all_characters() #Peut etre changer pour d'autre jeux
+        self.characterList = []
         self.bestOf_N = 3  # Nombre de jeux par match, peut être modifié selon le tournoi
         self.round_where_bo5_start_winner = None 
         self.round_where_bo5_start_loser = None

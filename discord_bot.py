@@ -19,8 +19,8 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # AJOUTEZ ces attributs au bot pour éviter les variables globales
-bot.match_manager = None
-bot.current_tournament = None
+bot.match_manager = []
+bot.current_tournament = []
 current_tournament_guild_id = None
 
 

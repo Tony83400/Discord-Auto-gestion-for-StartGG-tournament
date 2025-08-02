@@ -185,12 +185,6 @@ class StartGG:
             name
             numEntrants 
         }
-        stations(perPage: 500) {
-            nodes {
-                id
-                number
-            }
-        }
         admins(roles: null) {
             name
         }
