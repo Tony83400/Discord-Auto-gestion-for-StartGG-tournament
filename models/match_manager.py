@@ -1,5 +1,6 @@
 
 import asyncio
+import copy
 from typing import Dict, List
 import discord
 from discord.ext import commands
@@ -16,7 +17,26 @@ class MatchManager:
         self.is_running = False
         self.player_can_check_presence_of_other_player = player_can_check_presence_of_other_player  # Indique si les joueurs peuvent vérifier la présence de l'autre
         self.player_list = {}  # Dictionnaire pour stocker les joueurs et leurs IDs Discord
-        
+    def deepcopy(self):
+        # Crée une nouvelle instance sans appeler __init__ (pour éviter side effects)
+        new_manager = MatchManager.__new__(MatchManager)
+
+        # Copier les attributs simples
+        new_manager.bot = self.bot  # Référence au bot, pas besoin de deepcopy
+        # deepcopy du tournament si possible, sinon utiliser copy.deepcopy
+
+        new_manager.tournament = copy.deepcopy(self.tournament)
+
+        # Copie profonde des dictionnaires et listes
+        new_manager.active_matches = copy.deepcopy(self.active_matches)
+        new_manager.pending_matches = copy.deepcopy(self.pending_matches)
+
+        # Copie des autres attributs
+        new_manager.is_running = copy.copy(self.is_running)
+        new_manager.player_can_check_presence_of_other_player = copy.copy( self.player_can_check_presence_of_other_player)
+        new_manager.player_list = copy.deepcopy(self.player_list)
+
+        return new_manager   
     async def initialize_matches(self, interaction):
         """Initialise la liste des matchs en attente"""
         try:

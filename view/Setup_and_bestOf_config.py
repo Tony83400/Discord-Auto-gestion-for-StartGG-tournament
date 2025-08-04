@@ -1,6 +1,7 @@
 import discord
 from models.lang import translate
 from models.tournament import Tournament
+import copy
 
 
 class BoSelector(discord.ui.Select):
@@ -453,20 +454,18 @@ class SetupAndBestOfConfig(discord.ui.View):
             # Créer le gestionnaire de matchs avec la configuration BO
             from models.match_manager import MatchManager
             player_can_check_presence_of_other_player = self.player_can_check_presence
-
             match_manager = MatchManager(self.bot, self.tournament, player_can_check_presence_of_other_player=player_can_check_presence_of_other_player)
             match_manager.player_list = self.tournament.DiscordIdForPlayer
-            
+
             # Configurer le BO dans le gestionnaire
             if self.selected_bo != "custom":
                 self.tournament.set_best_of(int(self.selected_bo))
-            
             # Assigner aux variables globales du bot
             if hasattr(self.bot, 'current_tournament'):
-                self.bot.current_tournament.append( self.tournament)
+                self.bot.current_tournament.append( copy.deepcopy(self.tournament) )
             if hasattr(self.bot, 'match_manager'):
-                self.bot.match_manager.append(  match_manager )
-            
+                self.bot.match_manager.append( match_manager.deepcopy() )
+           
             # Créer l'embed de confirmation
             embed = discord.Embed(
                 title=translate("tournament_config_success"),
@@ -550,13 +549,14 @@ class SetupAndBestOfConfig(discord.ui.View):
             except (discord.NotFound, discord.Forbidden):
                 pass
             print(translate("tournament_config_log", bo=self.selected_bo, count=self.num_setups, first=self.first_setup_number, last=self.first_setup_number + self.num_setups - 1))
-            print("\nPool Number:", self.pool_number,"\n")
             if (self.pool_number >1) :
                 #Lance une nouvelle configuration de tournoi
                 from view.event_selector_view import TournamentView
+                self.tournament.already_selected.append(self.tournament.selectedEvent)
+                print(self.tournament.already_selected)
                 event_view = TournamentView(tournament=self.tournament, bot=self.bot, pool_number=self.pool_number-1)
                 await interaction.followup.send(
-                    translate("event_selector_message"),
+                    translate("event_select_placeholder"),
                     view=event_view,
                     ephemeral=True
                 )

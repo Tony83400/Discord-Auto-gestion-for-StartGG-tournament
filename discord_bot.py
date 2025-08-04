@@ -113,7 +113,8 @@ async def start_matches(interaction: discord.Interaction):
         return
     
     await interaction.response.defer()
-    await bot.match_manager.start_match_processing(interaction)
+    for match_manager in bot.match_manager:
+        await match_manager.start_match_processing(interaction)
 
 @bot.tree.command(name="stop_matches", description=translate("stop_matches_description"))
 @has_role("Tournament Admin")
@@ -131,7 +132,8 @@ async def stop_matches(interaction: discord.Interaction):
         )
         return
     await interaction.response.defer()
-    await bot.match_manager.stop_match_processing(interaction)
+    for match_manager in bot.match_manager:
+        await match_manager.stop_match_processing(interaction)
     
     deleted_channels = 0
     for channel in interaction.guild.channels:
@@ -152,10 +154,10 @@ async def stop_matches(interaction: discord.Interaction):
             pass
         except discord.HTTPException:
             pass
-    
-    bot.match_manager.reset_all_match()
-    bot.match_manager.active_matches.clear()
-    bot.match_manager.pending_matches.clear()
+    for match_manager in bot.match_manager:
+        match_manager.reset_all_match()
+        match_manager.active_matches.clear()
+        match_manager.pending_matches.clear()
     await interaction.followup.send(
         translate(
             "full_stop_done",
@@ -166,14 +168,15 @@ async def stop_matches(interaction: discord.Interaction):
 @has_role("Tournament Admin")
 async def delete_all_stations(interaction: discord.Interaction):
     num_stations = 0
-    if bot.current_tournament:
-        for station in bot.current_tournament.station:
-            station['isUsed'] = False
-            bot.current_tournament.sgg_request.delete_station(station['id'])
-            num_stations += 1
-    await interaction.response.send_message(
-        translate("delete_stations_done", num_station=num_stations),
-    )
+    for current_tournament in bot.current_tournament:
+        if current_tournament:
+            for station in current_tournament.station:
+                station['isUsed'] = False
+                current_tournament.sgg_request.delete_station(station['id'])
+                num_stations += 1
+        await interaction.response.send_message(
+            translate("delete_stations_done", num_station=num_stations),
+        )
     
 
 @bot.tree.command(name="match_status", description=translate("match_status_description"))
@@ -190,42 +193,43 @@ async def match_status(interaction: discord.Interaction):
         )
         return
     await interaction.response.defer()
-    await bot.match_manager.get_status(interaction)
+    for match_manager in bot.match_manager:
+        await match_manager.get_status(interaction)
 
 
 
-@bot.tree.command(name="force_station_free", description=translate("force_station_free_description"))
-@has_role("Tournament Admin")
-@app_commands.describe(station_number="Numéro de la station à libérer")
-async def force_station_free(interaction: discord.Interaction, station_number: int):
-    if not bot.current_tournament:
-        await interaction.response.send_message(translate("no_tournament"))
-        return
-    global current_tournament_guild_id
+# @bot.tree.command(name="force_station_free", description=translate("force_station_free_description"))
+# @has_role("Tournament Admin")
+# @app_commands.describe(station_number="Numéro de la station à libérer")
+# async def force_station_free(interaction: discord.Interaction, station_number: int):
+#     if not bot.current_tournament:
+#         await interaction.response.send_message(translate("no_tournament"))
+#         return
+#     global current_tournament_guild_id
 
-    if current_tournament_guild_id != interaction.guild.id:
-        await interaction.response.send_message(
-            translate("wrong_guild"),
-            ephemeral=True
-        )
-        return
-    await interaction.response.defer()
+#     if current_tournament_guild_id != interaction.guild.id:
+#         await interaction.response.send_message(
+#             translate("wrong_guild"),
+#             ephemeral=True
+#         )
+#         return
+#     await interaction.response.defer()
     
-    try:
-        for station in bot.current_tournament.station:
-            if station['number'] == station_number:
-                station['isUsed'] = False
-                if 'current_match' in station:
-                    del station['current_match']
-                break
+#     try:
+#         for station in bot.current_tournament.station:
+#             if station['number'] == station_number:
+#                 station['isUsed'] = False
+#                 if 'current_match' in station:
+#                     del station['current_match']
+#                 break
         
-        if bot.match_manager and station_number in bot.match_manager.active_matches:
-            await bot.match_manager.cleanup_completed_match(interaction, station_number)
+#         if bot.match_manager and station_number in bot.match_manager.active_matches:
+#             await bot.match_manager.cleanup_completed_match(interaction, station_number)
         
-        await interaction.followup.send(translate("station_freed", number=station_number))
+#         await interaction.followup.send(translate("station_freed", number=station_number))
 
-    except Exception as e:
-        await interaction.followup.send(translate("station_free_error", error=e))
+#     except Exception as e:
+#         await interaction.followup.send(translate("station_free_error", error=e))
 
 @bot.tree.command(name="list_stations", description=translate("stations_description"))
 async def list_stations(interaction: discord.Interaction):
