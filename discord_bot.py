@@ -21,6 +21,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # AJOUTEZ ces attributs au bot pour éviter les variables globales
 bot.match_manager = []
 bot.current_tournament = []
+bot.player_in_game = []
 current_tournament_guild_id = None
 
 
@@ -174,9 +175,9 @@ async def delete_all_stations(interaction: discord.Interaction):
                 station['isUsed'] = False
                 current_tournament.sgg_request.delete_station(station['id'])
                 num_stations += 1
-        await interaction.response.send_message(
-            translate("delete_stations_done", num_station=num_stations),
-        )
+    await interaction.response.send_message(
+        translate("delete_stations_done", num_station=num_stations),
+    )
     
 
 @bot.tree.command(name="match_status", description=translate("match_status_description"))

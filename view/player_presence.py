@@ -180,8 +180,7 @@ async def check_player_presence(channel, my_match, match_manager, station_number
         p1_discord_id = int(p1_discord_id)
     if p2_discord_id is not None:   
         p2_discord_id = int(p2_discord_id)
-    
-    await channel.send(translate("match_started", p1_id=p1_discord_id, p2_id=p2_discord_id, bo=my_match.bestOf_N , round=my_match.round))
+    await channel.send(translate("match_started", p1_id=p1_discord_id, p2_id=p2_discord_id, bo=my_match.bestOf_N , round=my_match.round, eventName=match_manager.tournament.selectedEvent['name']))
 
     # Créer la vue de vérification de présence
     presence_view = PlayerPresenceView(

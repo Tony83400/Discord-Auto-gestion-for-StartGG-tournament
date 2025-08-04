@@ -1,4 +1,3 @@
-
 import asyncio
 import copy
 from typing import Dict, List
@@ -17,6 +16,22 @@ class MatchManager:
         self.is_running = False
         self.player_can_check_presence_of_other_player = player_can_check_presence_of_other_player  # Indique si les joueurs peuvent vérifier la présence de l'autre
         self.player_list = {}  # Dictionnaire pour stocker les joueurs et leurs IDs Discord
+    def are_players_available(self, match_to_check):
+        """Vérifie si les joueurs du match ne sont pas déjà dans un match en cours"""
+        p1_id = match_to_check['slots'][0]['entrant']['id']
+        p2_id = match_to_check['slots'][1]['entrant']['id']
+        p1_discord_id = self.tournament.DiscordIdForPlayer.get(p1_id)
+        p2_discord_id = self.tournament.DiscordIdForPlayer.get(p2_id)
+        
+        for player_id in self.bot.player_in_game:
+            if player_id == p1_discord_id:
+                return False, match_to_check['slots'][0]['entrant']['name']
+            if player_id == p2_discord_id:
+                return False, match_to_check['slots'][1]['entrant']['name']
+        
+        return True, None
+        
+        return True
     def deepcopy(self):
         # Crée une nouvelle instance sans appeler __init__ (pour éviter side effects)
         new_manager = MatchManager.__new__(MatchManager)
@@ -41,6 +56,7 @@ class MatchManager:
         """Initialise la liste des matchs en attente"""
         try:
             matches = self.tournament.get_matches(state=1)  # Matchs non commencés
+            
             self.pending_matches = matches.copy()
             await interaction.followup.send(translate("pending_matches_count", count=len(self.pending_matches)))
             return True
@@ -145,12 +161,43 @@ class MatchManager:
                 if not station['isUsed'] and station['number'] not in self.active_matches:
                     available_stations.append(station['number'])
             
+            # Variables pour suivre l'état précédent
+            if not hasattr(self, '_last_availability_status'):
+                self._last_availability_status = None
+                self._unavailable_players = set()
+            
+            current_unavailable_players = set()
+            any_available = False
+            
             # Assigner un match par station disponible
             for station_num in available_stations:
                 if not self.pending_matches:
                     break
                     
-                match_to_assign = self.pending_matches.pop(0)
+                # Trouver le premier match avec des joueurs disponibles
+                match_index = None
+                for i, match in enumerate(self.pending_matches):
+                    available, unavailable_player = self.are_players_available(match)
+                    if available:
+                        match_index = i
+                        any_available = True
+                        break
+                    elif unavailable_player:
+                        current_unavailable_players.add(unavailable_player)
+                
+                if match_index is None:
+                    # Aucun match avec joueurs disponibles
+                    if current_unavailable_players != self._unavailable_players:
+                        # Envoyer un message seulement si la liste des joueurs indisponibles a changé
+                        players_list = ", ".join(current_unavailable_players)
+                        await interaction.followup.send(
+                            translate("players_unavailable", players=players_list),
+                            delete_after=60  # Supprime le message après 60 secondes
+                        )
+                        self._unavailable_players = current_unavailable_players
+                    return
+                    
+                match_to_assign = self.pending_matches.pop(match_index)
                 await self.assign_match_to_station(interaction, match_to_assign, station_num)
                 
         except Exception as e:
@@ -169,6 +216,12 @@ class MatchManager:
                     station['isUsed'] = True
                     station['current_match'] = sgg_match
                     break
+            # Ajouter les joueurs à la liste des joueurs en jeu
+            p1_id = sgg_match['slots'][0]['entrant']['id']
+            p2_id = sgg_match['slots'][1]['entrant']['id']
+            p1_id = self.tournament.DiscordIdForPlayer.get(p1_id)
+            p2_id = self.tournament.DiscordIdForPlayer.get(p2_id)
+            self.bot.player_in_game.extend([p1_id, p2_id])  # Modification ici
             channel = await self.create_match_channel(interaction.guild, my_match, station_number)
             self.active_matches[station_number] = {
                 'match_object': my_match,
@@ -180,7 +233,12 @@ class MatchManager:
             self.active_matches[station_number]['task'] = task
             p1_name = sgg_match['slots'][0]['entrant']['name']
             p2_name = sgg_match['slots'][1]['entrant']['name']
+            p1_id = sgg_match['slots'][0]['entrant']['id']
+            p2_id = sgg_match['slots'][1]['entrant']['id']
             try:
+                p1_id = self.tournament.DiscordIdForPlayer.get(p1_id)
+                p2_id = self.tournament.DiscordIdForPlayer.get(p2_id)
+                self.bot.player_in_game.append(p1_id, p2_id)
                 await interaction.followup.send(translate("match_assigned", station=station_number, p1=p1_name, p2=p2_name))
             except:
                 await interaction.channel.send(translate("match_assigned", station=station_number, p1=p1_name, p2=p2_name))
@@ -361,6 +419,17 @@ class MatchManager:
             match_info = self.active_matches.get(station_number)
             if not match_info:
                 return
+            # Retirer les joueurs de la liste des joueurs en jeu
+            sgg_match = match_info['sgg_match']
+            p1_id = sgg_match['slots'][0]['entrant']['id']
+            p2_id = sgg_match['slots'][1]['entrant']['id']
+            p1_id = self.tournament.DiscordIdForPlayer.get(p1_id)
+            p2_id = self.tournament.DiscordIdForPlayer.get(p2_id)
+            try:
+                self.bot.player_in_game.remove(p1_id)
+                self.bot.player_in_game.remove(p2_id)
+            except ValueError:
+                pass  # En cas où les IDs ne sont pas dans la liste
             for station in self.tournament.station:
                 if station['number'] == station_number:
                     station['isUsed'] = False

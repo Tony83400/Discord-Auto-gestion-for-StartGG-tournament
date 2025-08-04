@@ -1,8 +1,20 @@
 import copy
 from models.startgg_request import StartGG
 from models.match import Match
+global_id_counter = 0
 
+import threading
 
+# Compteur global et verrou pour la synchronisation
+_global_id_counter = 0
+_global_id_lock = threading.Lock()
+
+def get_next_global_int_id() -> int:
+    """Retourne un entier unique (thread-safe)."""
+    global _global_id_counter, _global_id_lock
+    with _global_id_lock:  # Verrou pour éviter les conflits en multi-thread
+        _global_id_counter += 1
+        return _global_id_counter
 class Tournament:
     def __init__(self, slug):
         self.slug = slug
@@ -27,6 +39,7 @@ class Tournament:
         self.round_where_bo5_start_loser = None
         self.bo_custom = False  # Indique si la configuration par round est personnalisée
         result = self.sgg_request.get_tournament(slug)
+        self.SHARED_player_who_are_playing = []
         self.already_selected = []
         if result:
             self.name = result.get('name')
@@ -41,6 +54,7 @@ class Tournament:
             players = self.sgg_request.get_all_player_event(self.selectedEvent['id'])
             if players:
                 for player in players:
+                    
                     newPlayer = {
                         'id': player['id'],
                         'name': player['name'],
@@ -51,7 +65,7 @@ class Tournament:
                                     newPlayer['discordId'] = elt['externalId']
                                     newPlayer['discordName'] = elt['externalUsername']
                     else:
-                        newPlayer['discordId'] = None
+                        newPlayer['discordId'] = get_next_global_int_id()  # Assign a unique ID if no Discord ID is found
                         newPlayer['discordName'] = None
                     self.playerList.append(newPlayer)
                 for player in self.playerList:
@@ -261,6 +275,8 @@ class Tournament:
             if attr == 'sgg_request':
                 # Réutiliser la même instance (ou créer une nouvelle manuellement si besoin)
                 setattr(copied, attr, self.sgg_request)
+            elif attr == "SHARED_player_who_are_playing":
+                setattr(copied, attr,self.SHARED_player_who_are_playing)  # Utiliser copy pour les listes partagées
             else:
                 setattr(copied, attr, copy.deepcopy(value, memo))
         return copied
