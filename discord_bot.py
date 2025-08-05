@@ -1,4 +1,5 @@
 
+import datetime
 from dotenv import load_dotenv
 import os
 import discord
@@ -112,7 +113,8 @@ async def start_matches(interaction: discord.Interaction):
             ephemeral=True
         )
         return
-    
+    for i in range(1,len(bot.current_tournament)):
+        bot.current_tournament[i].sgg_request = bot.current_tournament[0].sgg_request
     await interaction.response.defer()
     for match_manager in bot.match_manager:
         await match_manager.start_match_processing(interaction)
@@ -324,12 +326,42 @@ async def key_info(interaction: discord.Interaction):
         return
     
     await interaction.response.defer()
-    rate_status = bot.current_tournament.sgg_request.get_rate_limit_status()
-    embed = discord.Embed(title=translate("key_info_title"), color=0x3498db)
-    
+    embed = discord.Embed(title="📊 Statut des clés API", color=0x3498db)
+    embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/2889/2889676.png")  # Icône de statistiques
+
+    rate_status = bot.current_tournament[0].sgg_request.get_rate_limit_status()
+
     for key, status in rate_status.items():
-        embed.add_field(name=f"Key: {key}", value=status, inline=False)
-    
+        # Déterminer la couleur en fonction de l'utilisation
+        used = status['requêtes_utilisées']
+        remaining = status['requêtes_restantes']
+        total = used + remaining
+        percentage = (used / total) * 100 if total > 0 else 0
+        
+        if percentage > 80:
+            color = 0xe74c3c  # Rouge
+        elif percentage > 50:
+            color = 0xf39c12  # Orange
+        else:
+            color = 0x2ecc71  # Vert
+        
+        value = (
+            f"🔹 Utilisées: **{used}** requêtes\n"
+            f"🔹 Restantes: **{remaining}** requêtes\n"
+            f"📊 Utilisation: **{percentage:.1f}%**\n"
+            f"⏳ Réinitialisation: **{status['prochaine_réinitialisation']}**"
+        )
+        
+        embed.add_field(
+            name=f"🔑 {key}",
+            value=value,
+            inline=False
+        )
+
+    # Ajouter un footer avec la date/heure actuelle
+    embed.set_footer(text=f"Mis à jour le {datetime.datetime.now().strftime('%d/%m/%Y à %H:%M:%S')}")
+
     await interaction.followup.send(embed=embed)
+    
 
 bot.run(token)

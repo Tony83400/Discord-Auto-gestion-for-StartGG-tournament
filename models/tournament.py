@@ -16,9 +16,12 @@ def get_next_global_int_id() -> int:
         _global_id_counter += 1
         return _global_id_counter
 class Tournament:
-    def __init__(self, slug):
+    def __init__(self, slug , startgg_request: StartGG = None):
         self.slug = slug
-        self.sgg_request = StartGG()
+        if startgg_request:
+            self.sgg_request = startgg_request
+        else:
+            self.sgg_request =  StartGG()
         self.events = None
         self.selectedEvent = None
         self.name= None
@@ -39,7 +42,6 @@ class Tournament:
         self.round_where_bo5_start_loser = None
         self.bo_custom = False  # Indique si la configuration par round est personnalisée
         result = self.sgg_request.get_tournament(slug)
-        self.SHARED_player_who_are_playing = []
         self.already_selected = []
         if result:
             self.name = result.get('name')
@@ -275,8 +277,6 @@ class Tournament:
             if attr == 'sgg_request':
                 # Réutiliser la même instance (ou créer une nouvelle manuellement si besoin)
                 setattr(copied, attr, self.sgg_request)
-            elif attr == "SHARED_player_who_are_playing":
-                setattr(copied, attr,self.SHARED_player_who_are_playing)  # Utiliser copy pour les listes partagées
             else:
                 setattr(copied, attr, copy.deepcopy(value, memo))
         return copied

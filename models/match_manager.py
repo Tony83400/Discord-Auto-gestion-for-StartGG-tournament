@@ -16,6 +16,7 @@ class MatchManager:
         self.is_running = False
         self.player_can_check_presence_of_other_player = player_can_check_presence_of_other_player  # Indique si les joueurs peuvent vérifier la présence de l'autre
         self.player_list = {}  # Dictionnaire pour stocker les joueurs et leurs IDs Discord
+        self.match_already_played = []
     def are_players_available(self, match_to_check):
         """Vérifie si les joueurs du match ne sont pas déjà dans un match en cours"""
         p1_id = match_to_check['slots'][0]['entrant']['id']
@@ -38,18 +39,20 @@ class MatchManager:
 
         # Copier les attributs simples
         new_manager.bot = self.bot  # Référence au bot, pas besoin de deepcopy
-        # deepcopy du tournament si possible, sinon utiliser copy.deepcopy
-
         new_manager.tournament = copy.deepcopy(self.tournament)
 
         # Copie profonde des dictionnaires et listes
         new_manager.active_matches = copy.deepcopy(self.active_matches)
         new_manager.pending_matches = copy.deepcopy(self.pending_matches)
+        new_manager.match_already_played = copy.deepcopy(self.match_already_played)
 
         # Copie des autres attributs
         new_manager.is_running = copy.copy(self.is_running)
-        new_manager.player_can_check_presence_of_other_player = copy.copy( self.player_can_check_presence_of_other_player)
+        new_manager.player_can_check_presence_of_other_player = copy.copy(self.player_can_check_presence_of_other_player)
         new_manager.player_list = copy.deepcopy(self.player_list)
+ 
+
+        return new_manager
 
         return new_manager   
     async def initialize_matches(self, interaction):
@@ -177,6 +180,8 @@ class MatchManager:
                 # Trouver le premier match avec des joueurs disponibles
                 match_index = None
                 for i, match in enumerate(self.pending_matches):
+                    if match['id'] in self.match_already_played:
+                        continue
                     available, unavailable_player = self.are_players_available(match)
                     if available:
                         match_index = i
@@ -303,7 +308,7 @@ class MatchManager:
             if not channel:
                 print(translate("no_channel_for_match"))
                 return
-            
+            self.match_already_played.append(my_match.matchId)
             # Récupérer les informations du match
             p1_id_sgg = my_match.p1['id']
             p2_id_sgg = my_match.p2['id']
@@ -480,4 +485,3 @@ class MatchManager:
                 inline=False
             )
         await interaction.followup.send(embed=embed)
-        
