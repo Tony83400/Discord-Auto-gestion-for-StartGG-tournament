@@ -30,10 +30,6 @@ class StartGG:
         for key in self.api_keys:
             self.request_history[key] = deque()
             self.locks[key] = Lock()
-        print(f"🔑 Initialisation avec {len(self.api_keys)} clés API.")
-        print("📊 Statut des limites de rate:")
-        for key, status in self.get_rate_limit_status().items():
-            print(f"  {key}: {status['requêtes_restantes']}/{self.max_requests_per_minute} requêtes restantes")    
     def _load_api_keys_from_env(self) -> List[str]:
         """Charge les clés API depuis les variables d'environnement."""
         keys = []
@@ -184,12 +180,6 @@ class StartGG:
             id
             name
             numEntrants 
-        }
-        stations(perPage: 500) {
-            nodes {
-                id
-                number
-            }
         }
         admins(roles: null) {
             name

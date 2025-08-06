@@ -142,7 +142,7 @@ translations = {
         "match_assigned": "🎮 Match assigné à la station {station} : **{p1}** vs **{p2}**",
         "match_assign_error": "❌ Erreur lors de l'assignation du match : {error}",
         "no_channel_for_match": "Aucun channel disponible pour le match",
-        "match_started": "🎯 **Match commencé** - <@{p1_id}> vs <@{p2_id}> (BO{bo}) {round}",
+        "match_started": "🎯 **Match commencé** - <@{p1_id}> vs <@{p2_id}> (BO{bo}) {round} {eventName}",
         "game_waiting_report": "**Game {game}** - En attente du résultat...",
         "game_reported": "✅ Game {game} reporté : **{winner}** gagne",
         "match_finished": "🏆 **Match terminé !** Vainqueur : **{winner}**",
@@ -185,6 +185,31 @@ translations = {
         "search_modal_title": "Recherche de personnage",
         "select_winner": "Sélectionner le vainqueur",
         "validate": "Valider",
+        "select_number_of_tournaments": "Sélectionnez le nombre de tournois à configurer",
+        "select_number_of_tournaments_prompt": "Combien de tournois souhaitez-vous configurer ?",
+        "number_of_tournaments": "Nombre de tournois",
+         "select_phase_before_validate": " ❌ Veuillez sélectionner une phase avant de valider.",
+        "select_pool_before_validate" : " ❌ Veuillez sélectionner une poule avant de valider.",
+        "select_event_before_validate": " ❌ Veuillez sélectionner un événement avant de valider.",
+        # Gestion multi-tournois
+"both_players_not_in_tournament": "Les joueurs {p1} et {p2} ne sont pas inscrits dans {tournament}",
+"player_not_in_tournament": "Le joueur {player} n'est pas inscrit dans {tournament}",
+"player_busy_in_other_tournament": "{player} joue déjà dans : {tournaments}",
+"both_players_unavailable": "{p1_reason} | {p2_reason}",
+"player_unavailable_unknown": "{player} n'est pas disponible (raison inconnue)",
+
+# Nettoyage et diagnostic
+"match_manager_stopped_cleaned": "Gestionnaire arrêté pour {tournament}. {players_removed} joueurs libérés.",
+"status_tournament_players_in_game_label": "Joueurs en jeu (ce tournoi)",
+"tournament_conflicts_diagnosis_title": "Diagnostic des conflits entre tournois",
+"conflicted_matches_label": "Matchs en conflit",
+"active_tournaments_label": "Tournois actifs",
+"current_tournament_label": "Tournoi actuel",
+"no_conflicts_detected": "Aucun conflit détecté",
+
+# Logging amélioré
+"players_added_to_game_log": "Joueurs {p1}, {p2} ajoutés à {tournament}. Global: {total_global}, Tournoi: {total_tournament}",
+"players_removed_from_game_log": "Joueurs {p1}, {p2} retirés de {tournament}. Global: {total_global}, Tournoi: {total_tournament}",
     },
     "en": {
         "station_assigned_log": "Station: {station} assigned to match: {match}",
@@ -252,6 +277,9 @@ translations = {
         "tournament_not_found": "❌ Tournament '{slug}' not found. Check the link and try again.",
         "admin_rights_required": "❌ The associated start.gg key must have admin rights to manage this tournament.",
         "tournament_config_success": "✅ Tournament configured successfully!",
+        "select_phase_before_validate": "❌ Please select a phase before validating.",
+        "select_pool_before_validate" : "❌ Please select a pool before validating.",
+        "select_event_before_validate": "❌ Please select an event before validating.",
         "events_label": "🎮 Events",
         "all_player_can_check_presence": "Players can check in each other's presence",
         "no_player_can_check_presence": "Players can't check in each other's presence",
@@ -326,7 +354,7 @@ translations = {
         "match_assigned": "🎮 Match assigned to station {station}: **{p1}** vs **{p2}**",
         "match_assign_error": "❌ Error assigning match: {error}",
         "no_channel_for_match": "No channel available for the match",
-        "match_started": "🎯 **Match started** - <@{p1_id}> vs <@{p2_id}> (BO{bo}) {round}",
+        "match_started": "🎯 **Match started** - <@{p1_id}> vs <@{p2_id}> (BO{bo}) {round} {eventName}",
         "game_waiting_report": "**Game {game}** - Waiting for report...",
         "game_reported": "✅ Game {game} reported: **{winner}** wins",
         "match_finished": "🏆 **Match finished!** Winner: **{winner}**",
@@ -369,6 +397,27 @@ translations = {
         "search_modal_title": "Search Character",
         "select_winner": "Select Winner",
         "validate": "Validate",
+        "select_number_of_tournaments": "Select the number of tournaments to configure",
+        "select_number_of_tournaments_prompt": "How many tournaments do you want to configure?",
+        "number_of_tournaments": "Number of tournaments",
+        "both_players_not_in_tournament": "Both players {p1} and {p2} are not registered in {tournament}",
+"player_not_in_tournament": " Player {player} is not registered in {tournament}",
+"player_busy_in_other_tournament": " {player} is already playing in: {tournaments}",
+"both_players_unavailable": " {p1_reason} | {p2_reason}",
+"player_unavailable_unknown": " {player} is not available (unknown reason)",
+
+# Nettoyage et diagnostic
+"match_manager_stopped_cleaned": " Match manager stopped for {tournament}. {players_removed} players freed.",
+"status_tournament_players_in_game_label": " Players in game (this tournament)",
+"tournament_conflicts_diagnosis_title": " Tournament Conflict Diagnosis",
+"conflicted_matches_label": " Conflicted Matches",
+"active_tournaments_label": " Active Tournaments",
+"current_tournament_label": " Current Tournament",
+"no_conflicts_detected": " No conflicts detected",
+
+# Logging amélioré
+"players_added_to_game_log": "Joueurs {p1}, {p2} ajoutés à {tournament}. Global: {total_global}, Tournoi: {total_tournament}",
+"players_removed_from_game_log": "Joueurs {p1}, {p2} retirés de {tournament}. Global: {total_global}, Tournoi: {total_tournament}",
     }
 }
 

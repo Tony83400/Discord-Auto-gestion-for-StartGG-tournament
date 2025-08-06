@@ -1,6 +1,8 @@
+from random import random
 import discord
 from models.lang import translate
 from models.tournament import Tournament
+import copy
 
 
 class BoSelector(discord.ui.Select):
@@ -340,11 +342,11 @@ class CustomBoConfigView(discord.ui.View):
 
 
 class SetupAndBestOfConfig(discord.ui.View):
-    def __init__(self, tournament, bot):
+    def __init__(self, tournament, bot , pool_number: int):
         super().__init__(timeout=300)
         self.tournament = tournament
         self.bot = bot
-        
+        self.pool_number = pool_number
         # Initialize default values
         self.selected_bo = "3"
         self.num_setups = 2
@@ -439,6 +441,7 @@ class SetupAndBestOfConfig(discord.ui.View):
         """Lance le tournoi avec la configuration choisie"""
         await interaction.response.defer(ephemeral=True)
         
+        
         try:
             # Supprimer les anciennes stations s'il y en a
             if hasattr(self.tournament, 'stations'):
@@ -452,20 +455,20 @@ class SetupAndBestOfConfig(discord.ui.View):
             # Créer le gestionnaire de matchs avec la configuration BO
             from models.match_manager import MatchManager
             player_can_check_presence_of_other_player = self.player_can_check_presence
-
             match_manager = MatchManager(self.bot, self.tournament, player_can_check_presence_of_other_player=player_can_check_presence_of_other_player)
             match_manager.player_list = self.tournament.DiscordIdForPlayer
-            
+
             # Configurer le BO dans le gestionnaire
             if self.selected_bo != "custom":
                 self.tournament.set_best_of(int(self.selected_bo))
-            
             # Assigner aux variables globales du bot
+            #Ajoute un nombre random entre 1 et 1000 pour éviter les conflit
+           
             if hasattr(self.bot, 'current_tournament'):
-                self.bot.current_tournament = self.tournament
+                self.bot.current_tournament.append( copy.deepcopy(self.tournament) )
             if hasattr(self.bot, 'match_manager'):
-                self.bot.match_manager = match_manager
-            
+                self.bot.match_manager.append( match_manager.deepcopy() )
+
             # Créer l'embed de confirmation
             embed = discord.Embed(
                 title=translate("tournament_config_success"),
@@ -544,8 +547,21 @@ class SetupAndBestOfConfig(discord.ui.View):
                 embed=embed,
                 ephemeral=True
             )
+            try:
+                await interaction.delete_original_response()
+            except (discord.NotFound, discord.Forbidden):
+                pass
             print(translate("tournament_config_log", bo=self.selected_bo, count=self.num_setups, first=self.first_setup_number, last=self.first_setup_number + self.num_setups - 1))
-            
+            if (self.pool_number >1) :
+                #Lance une nouvelle configuration de tournoi
+                from view.event_selector_view import TournamentView
+                self.tournament.already_selected.append(self.tournament.selectedEvent)
+                event_view = TournamentView(tournament=self.tournament, bot=self.bot, pool_number=self.pool_number-1)
+                await interaction.followup.send(
+                    translate("event_select_placeholder"),
+                    view=event_view,
+                    ephemeral=True
+                )
         except Exception as e:
             await interaction.followup.send(
                 f"❌ Erreur lors du lancement du tournoi: {str(e)}",

@@ -1,13 +1,27 @@
+import copy
 from models.startgg_request import StartGG
 from models.match import Match
-from dotenv import load_dotenv
+global_id_counter = 0
 
+import threading
 
+# Compteur global et verrou pour la synchronisation
+_global_id_counter = 0
+_global_id_lock = threading.Lock()
 
+def get_next_global_int_id() -> int:
+    """Retourne un entier unique (thread-safe)."""
+    global _global_id_counter, _global_id_lock
+    with _global_id_lock:  # Verrou pour éviter les conflits en multi-thread
+        _global_id_counter += 1
+        return _global_id_counter
 class Tournament:
-    def __init__(self, slug):
+    def __init__(self, slug , startgg_request: StartGG = None):
         self.slug = slug
-        self.sgg_request = StartGG()
+        if startgg_request:
+            self.sgg_request = startgg_request
+        else:
+            self.sgg_request =  StartGG()
         self.events = None
         self.selectedEvent = None
         self.name= None
@@ -22,12 +36,13 @@ class Tournament:
         self.rounds = None
         self.id = None
         self.numAttendees = 0
-        self.characterList = self.sgg_request.get_all_characters() #Peut etre changer pour d'autre jeux
+        self.characterList = []
         self.bestOf_N = 3  # Nombre de jeux par match, peut être modifié selon le tournoi
         self.round_where_bo5_start_winner = None 
         self.round_where_bo5_start_loser = None
         self.bo_custom = False  # Indique si la configuration par round est personnalisée
         result = self.sgg_request.get_tournament(slug)
+        self.already_selected = []
         if result:
             self.name = result.get('name')
             self.events = result.get('events', [])
@@ -41,6 +56,7 @@ class Tournament:
             players = self.sgg_request.get_all_player_event(self.selectedEvent['id'])
             if players:
                 for player in players:
+                    
                     newPlayer = {
                         'id': player['id'],
                         'name': player['name'],
@@ -51,7 +67,7 @@ class Tournament:
                                     newPlayer['discordId'] = elt['externalId']
                                     newPlayer['discordName'] = elt['externalUsername']
                     else:
-                        newPlayer['discordId'] = None
+                        newPlayer['discordId'] = get_next_global_int_id()  # Assign a unique ID if no Discord ID is found
                         newPlayer['discordName'] = None
                     self.playerList.append(newPlayer)
                 for player in self.playerList:
@@ -249,6 +265,21 @@ class Tournament:
         else:
             print("No stations available.")
             return None
+    def __deepcopy__(self, memo = None):
+        if memo is None:
+            memo = {}
+        # Crée une nouvelle instance sans utiliser deepcopy sur sgg_request
+        copied = type(self)(self.slug)
+        memo[id(self)] = copied
+
+        # Copie manuellement les champs, sauf ceux à éviter
+        for attr, value in self.__dict__.items():
+            if attr == 'sgg_request':
+                # Réutiliser la même instance (ou créer une nouvelle manuellement si besoin)
+                setattr(copied, attr, self.sgg_request)
+            else:
+                setattr(copied, attr, copy.deepcopy(value, memo))
+        return copied
     
 
 def sggMatch_to_MyMatch(match, tournament : Tournament):
